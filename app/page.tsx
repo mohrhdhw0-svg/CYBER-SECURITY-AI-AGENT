@@ -36,7 +36,7 @@ const tools: Tool[] = [
   {name:"Hashcat",category:"تدقيق كلمات المرور",description:"تدقيق قوة كلمات المرور على عينات مصرح بها.",status:"planned",tag:"Audit"},
   {name:"John the Ripper",category:"تدقيق كلمات المرور",description:"تقييم تجزئات اختبارية في المختبر.",status:"planned",tag:"Audit"},
   {name:"BloodHound",category:"هوية ودليل نشط",description:"رسم علاقات وصلاحيات Active Directory.",status:"planned",tag:"Identity"},
-  {name:"Checkov",category:"السحابة والحاويات",description:"فحص البنية التحتية ككود.",status:"planned",tag:"IaC"}
+  {name:"Checkov",category:"السحابة والحاويات",description:"فحص البنية التحتية ككود.",status:"planned",tag:"IaC"},
 
   {name:"Amass",category:"استخبارات الأصول",description:"رسم سطح الهجوم واكتشاف الأصول والنطاقات المصرح بها.",status:"planned",tag:"ASM"},
   {name:"Subfinder",category:"استخبارات الأصول",description:"اكتشاف النطاقات الفرعية ضمن نطاق مملوك أو مصرح.",status:"planned",tag:"OSINT"},
