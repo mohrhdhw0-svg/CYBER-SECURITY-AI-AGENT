@@ -109,15 +109,15 @@ export default function Home() {
       <header className="topbar"><button className="menu-btn" onClick={()=>setMobileOpen(true)}><Menu/></button><div className="crumb">مساحة العمل <span>/</span> {active}</div><div className="top-actions"><span className="env"><i/> بيئة تطوير</span><button className="icon-btn"><Activity size={18}/></button><div className="avatar small">CA</div></div></header>
       <div className="content">
         <div className="welcome"><div><div className="eyebrow"><span/> DEFENSIVE SECURITY PLATFORM</div><h1>مركز العمليات الأمنية</h1><p>رؤية موحدة للأصول والفحوصات والأدوات والتحليلات الأمنية.</p></div><div className="date-chip"><Clock3 size={16}/> لوحة تحكم أولية</div></div>
-        <div className="notice"><ShieldAlert size={19}/><div><b>تنبيه: وضع العرض الأولي</b><p>الواجهة والكتالوج جاهزان كبنية أولية. محركات الفحص والمصادقة وقاعدة البيانات لم تُربط بعد، لذلك لن تظهر أي نتائج تشغيل وهمية.</p></div></div>
+        <div className="notice"><ShieldAlert size={19}/><div><b>حالة الربط والتشغيل</b><p>واجهة المنصة منشورة. موصل Nmap موجود في التطبيق، لكن تشغيل الفحص يتطلب نشر محرك Docker الخاص وضبط أسراره وقائمة عناوين المختبر المصرح بها. بقية الأدوات تظهر كتكاملات مخطط لها ولا تُعرض على أنها تعمل.</p></div></div>
         <EnginePanel />
         <div className="stats">
-          <Stat icon={Boxes} label="الأدوات في الكتالوج" value={tools.length.toString()} detail="تكاملات مخطط لها" tone="blue"/>
-          <Stat icon={Radar} label="مهام الفحص" value="0" detail="لا توجد مهام منفذة" tone="purple"/>
-          <Stat icon={ShieldCheck} label="الأصول المسجلة" value="0" detail="بانتظار إضافة نطاق مصرح" tone="green"/>
-          <Stat icon={AlertTriangle} label="تنبيهات مفتوحة" value="0" detail="لا توجد بيانات SOC بعد" tone="orange"/>
+          <Stat icon={Boxes} label="الأدوات في الكتالوج" value={tools.length.toString()} detail="أدوات مصنفة ضمن المنصة" tone="blue"/>
+          <Stat icon={Radar} label="موصلات الفحص" value="1" detail="Nmap API — ينتظر محرك Docker" tone="purple"/>
+          <Stat icon={ShieldCheck} label="الأصول المسجلة" value="0" detail="لا توجد أصول محفوظة بعد" tone="green"/>
+          <Stat icon={AlertTriangle} label="تنبيهات مفتوحة" value="0" detail="لم يُربط مصدر SOC بعد" tone="orange"/>
         </div>
-        <div className="section-head"><div><h2>كتالوج الأدوات الأمنية</h2><p>استكشف الأدوات التي سنربطها بمحركات تشغيل حقيقية على مراحل.</p></div><span className="count-pill">{filtered.length} أداة</span></div>
+        <div className="section-head"><div><h2>كتالوج الأدوات الأمنية</h2><p>استكشف الأدوات المصنفة. حالة كل تكامل موضحة بوضوح؛ لا يتم احتساب الأداة كعاملة قبل ربط محركها واختباره.</p></div><span className="count-pill">{filtered.length} أداة</span></div>
         <div className="filters"><div className="search"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ابحث عن أداة أو وظيفة..."/></div><div className="category-filter"><Filter size={17}/><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></div></div>
         <div className="tool-grid">{filtered.map(t=><article className="tool-card" key={t.name}><div className="tool-top"><div className="tool-icon"><TerminalSquare size={19}/></div><span className="planned"><span/> مخطط للربط</span></div><h3>{t.name}</h3><p>{t.description}</p><div className="tool-foot"><span>{t.category}</span><span>{t.tag}</span></div></article>)}</div>
         <footer><span>CYBER SECURITY AI AGENT</span><span><CircleCheck size={14}/> واجهة أولية — لا توجد عمليات فحص نشطة</span></footer>
