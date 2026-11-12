@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isIP } from "node:net";
+import { timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,8 +8,15 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   const base = process.env.ENGINE_URL?.replace(/\/$/, "");
   const token = process.env.ENGINE_API_TOKEN;
-  if (!base || !token) {
+  const scanKey = process.env.SCAN_ACCESS_KEY;
+  const suppliedKey = request.headers.get("x-scan-access-key") || "";
+  if (!base || !token || !scanKey) {
     return NextResponse.json({ error: "محرك الفحص غير مهيأ. يجب ضبط أسرار الخادم أولاً." }, { status: 503 });
+  }
+  const expected = Buffer.from(scanKey);
+  const supplied = Buffer.from(suppliedKey);
+  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
+    return NextResponse.json({ error: "مفتاح الوصول غير صحيح." }, { status: 401 });
   }
   let body: { target_ip?: unknown; authorization_reference?: unknown; confirm_authorized?: unknown; top_ports?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "طلب JSON غير صالح." }, { status: 400 }); }
