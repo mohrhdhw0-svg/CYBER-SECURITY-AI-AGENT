@@ -48,7 +48,7 @@ def nmap_scan(request: ScanRequest, authorization: Optional[str] = Header(defaul
     if not request.confirm_authorized:
         raise HTTPException(status_code=400, detail="Explicit authorization confirmation is required.")
     target = check_target(request.target_ip)
-    command = ["nmap","-sV","-T2","--top-ports",str(request.top_ports),"-oX","-",target]
+    command = ["nmap","-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(request.top_ports),"-oX","-",target]
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=90, check=False)
     except subprocess.TimeoutExpired:
