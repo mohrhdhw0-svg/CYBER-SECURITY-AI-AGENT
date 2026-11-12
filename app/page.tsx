@@ -37,6 +37,39 @@ const tools: Tool[] = [
   {name:"John the Ripper",category:"تدقيق كلمات المرور",description:"تقييم تجزئات اختبارية في المختبر.",status:"planned",tag:"Audit"},
   {name:"BloodHound",category:"هوية ودليل نشط",description:"رسم علاقات وصلاحيات Active Directory.",status:"planned",tag:"Identity"},
   {name:"Checkov",category:"السحابة والحاويات",description:"فحص البنية التحتية ككود.",status:"planned",tag:"IaC"}
+
+  {name:"Amass",category:"استخبارات الأصول",description:"رسم سطح الهجوم واكتشاف الأصول والنطاقات المصرح بها.",status:"planned",tag:"ASM"},
+  {name:"Subfinder",category:"استخبارات الأصول",description:"اكتشاف النطاقات الفرعية ضمن نطاق مملوك أو مصرح.",status:"planned",tag:"OSINT"},
+  {name:"httpx",category:"استخبارات الأصول",description:"التحقق من خدمات HTTP وتوصيفها ضمن قائمة أصول معتمدة.",status:"planned",tag:"HTTP"},
+  {name:"Katana",category:"أمن الويب",description:"زحف تطبيقات الويب لاكتشاف المسارات والواجهات.",status:"planned",tag:"Crawler"},
+  {name:"Semgrep",category:"أمن الشيفرة",description:"تحليل ساكن للشيفرة واكتشاف الأنماط الخطرة.",status:"planned",tag:"SAST"},
+  {name:"CodeQL",category:"أمن الشيفرة",description:"تحليل دلالي للشيفرة واكتشاف الثغرات.",status:"planned",tag:"SAST"},
+  {name:"Gitleaks",category:"أمن الشيفرة",description:"اكتشاف الأسرار ومفاتيح API المكشوفة في المستودعات.",status:"planned",tag:"Secrets"},
+  {name:"Bandit",category:"أمن الشيفرة",description:"تحليل أمان مشاريع Python.",status:"planned",tag:"SAST"},
+  {name:"Dependency-Track",category:"أمن سلسلة التوريد",description:"إدارة مخاطر مكونات البرمجيات وملفات SBOM.",status:"planned",tag:"SBOM"},
+  {name:"Syft",category:"أمن سلسلة التوريد",description:"إنشاء قوائم مكونات البرمجيات للحاويات والملفات.",status:"planned",tag:"SBOM"},
+  {name:"Grype",category:"أمن سلسلة التوريد",description:"فحص صور الحاويات ومكونات SBOM بحثاً عن ثغرات.",status:"planned",tag:"SCA"},
+  {name:"OSV-Scanner",category:"أمن سلسلة التوريد",description:"مطابقة الاعتماديات مع قاعدة بيانات OSV.",status:"planned",tag:"SCA"},
+  {name:"testssl.sh",category:"أمن الويب",description:"تقييم إعدادات TLS والشهادات والبروتوكولات.",status:"planned",tag:"TLS"},
+  {name:"Lynis",category:"تقوية الأنظمة",description:"تدقيق إعدادات Linux واقتراحات التقوية.",status:"planned",tag:"Hardening"},
+  {name:"OpenSCAP",category:"تقوية الأنظمة",description:"تقييم الامتثال الأمني وفق ملفات سياسات معيارية.",status:"planned",tag:"Compliance"},
+  {name:"osquery",category:"مراقبة SOC",description:"الاستعلام عن حالة الأجهزة ومؤشرات النظام.",status:"planned",tag:"EDR"},
+  {name:"Velociraptor",category:"الاستجابة للحوادث",description:"جمع الأدلة والتحقيق عن بُعد على الأجهزة المصرح بها.",status:"planned",tag:"DFIR"},
+  {name:"The Sleuth Kit",category:"الأدلة الرقمية",description:"تحليل أنظمة الملفات والأدلة الرقمية.",status:"planned",tag:"Forensics"},
+  {name:"Plaso / log2timeline",category:"الأدلة الرقمية",description:"إنشاء خطوط زمنية من مصادر الأدلة الرقمية.",status:"planned",tag:"Timeline"},
+  {name:"Falco",category:"السحابة والحاويات",description:"كشف السلوك غير المعتاد في وقت تشغيل الحاويات.",status:"planned",tag:"Runtime"},
+  {name:"kube-bench",category:"السحابة والحاويات",description:"تقييم إعدادات Kubernetes مقابل CIS Benchmarks.",status:"planned",tag:"Kubernetes"},
+  {name:"Prowler",category:"السحابة والحاويات",description:"تقييم الوضع الأمني لخدمات السحابة.",status:"planned",tag:"CSPM"},
+  {name:"ScoutSuite",category:"السحابة والحاويات",description:"تدقيق إعدادات بيئات AWS وAzure وGCP.",status:"planned",tag:"Cloud"},
+  {name:"CrowdSec",category:"مراقبة SOC",description:"تحليل السلوك ومشاركة مؤشرات الحظر الدفاعية.",status:"planned",tag:"防御"},
+  {name:"DefectDojo",category:"إدارة الثغرات",description:"تجميع نتائج الفحوصات وإدارة دورة معالجة الثغرات.",status:"planned",tag:"VM"},
+  {name:"Nessus",category:"إدارة الثغرات",description:"إدارة تقييم الثغرات عبر ماسح مرخص عند توفر الترخيص.",status:"planned",tag:"Scanner"},
+  {name:"Dependency-Check",category:"أمن سلسلة التوريد",description:"فحص الاعتماديات المعروفة بالثغرات.",status:"planned",tag:"SCA"},
+  {name:"Checkov",category:"السحابة والحاويات",description:"فحص ملفات البنية التحتية ككود قبل النشر.",status:"planned",tag:"IaC"},
+  {name:"KICS",category:"السحابة والحاويات",description:"تحليل إعدادات IaC بحثاً عن أخطاء التهيئة.",status:"planned",tag:"IaC"},
+  {name:"YARA-X",category:"تحليل البرمجيات",description:"مطابقة قواعد YARA-X لتحليل العينات في مختبر معزول.",status:"planned",tag:"Detection"},
+  {name:" capa",category:"تحليل البرمجيات",description:"استخراج القدرات والسلوكيات من الملفات التنفيذية.",status:"planned",tag:"Malware"}
+
 ];
 
 const categories = ["الكل", ...Array.from(new Set(tools.map(t => t.category)))];
