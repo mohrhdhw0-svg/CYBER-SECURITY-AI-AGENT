@@ -1,5 +1,6 @@
 services:
   security-engine:
+    image: ghcr.io/mohrhdhw0-svg/cyber-security-ai-agent-engine:latest
     build:
       context: ./engine
       dockerfile: Dockerfile
