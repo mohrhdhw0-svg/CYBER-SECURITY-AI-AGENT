@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import EnginePanel from "./components/engine-panel";
 import {
   Activity, ShieldCheck, Radar, Bug, Network, Smartphone, Cloud,
   Search, FileText, Settings, LayoutDashboard, Boxes, ChevronLeft,
@@ -109,6 +110,7 @@ export default function Home() {
       <div className="content">
         <div className="welcome"><div><div className="eyebrow"><span/> DEFENSIVE SECURITY PLATFORM</div><h1>مركز العمليات الأمنية</h1><p>رؤية موحدة للأصول والفحوصات والأدوات والتحليلات الأمنية.</p></div><div className="date-chip"><Clock3 size={16}/> لوحة تحكم أولية</div></div>
         <div className="notice"><ShieldAlert size={19}/><div><b>تنبيه: وضع العرض الأولي</b><p>الواجهة والكتالوج جاهزان كبنية أولية. محركات الفحص والمصادقة وقاعدة البيانات لم تُربط بعد، لذلك لن تظهر أي نتائج تشغيل وهمية.</p></div></div>
+        <EnginePanel />
         <div className="stats">
           <Stat icon={Boxes} label="الأدوات في الكتالوج" value={tools.length.toString()} detail="تكاملات مخطط لها" tone="blue"/>
           <Stat icon={Radar} label="مهام الفحص" value="0" detail="لا توجد مهام منفذة" tone="purple"/>
