@@ -59,16 +59,14 @@ const tools: Tool[] = [
   {name:"Plaso / log2timeline",category:"الأدلة الرقمية",description:"إنشاء خطوط زمنية من مصادر الأدلة الرقمية.",status:"planned",tag:"Timeline"},
   {name:"Falco",category:"السحابة والحاويات",description:"كشف السلوك غير المعتاد في وقت تشغيل الحاويات.",status:"planned",tag:"Runtime"},
   {name:"kube-bench",category:"السحابة والحاويات",description:"تقييم إعدادات Kubernetes مقابل CIS Benchmarks.",status:"planned",tag:"Kubernetes"},
-  {name:"Prowler",category:"السحابة والحاويات",description:"تقييم الوضع الأمني لخدمات السحابة.",status:"planned",tag:"CSPM"},
   {name:"ScoutSuite",category:"السحابة والحاويات",description:"تدقيق إعدادات بيئات AWS وAzure وGCP.",status:"planned",tag:"Cloud"},
-  {name:"CrowdSec",category:"مراقبة SOC",description:"تحليل السلوك ومشاركة مؤشرات الحظر الدفاعية.",status:"planned",tag:"防御"},
+  {name:"CrowdSec",category:"مراقبة SOC",description:"تحليل السلوك ومشاركة مؤشرات الحظر الدفاعية.",status:"planned",tag:"Behavior"},
   {name:"DefectDojo",category:"إدارة الثغرات",description:"تجميع نتائج الفحوصات وإدارة دورة معالجة الثغرات.",status:"planned",tag:"VM"},
   {name:"Nessus",category:"إدارة الثغرات",description:"إدارة تقييم الثغرات عبر ماسح مرخص عند توفر الترخيص.",status:"planned",tag:"Scanner"},
   {name:"Dependency-Check",category:"أمن سلسلة التوريد",description:"فحص الاعتماديات المعروفة بالثغرات.",status:"planned",tag:"SCA"},
-  {name:"Checkov",category:"السحابة والحاويات",description:"فحص ملفات البنية التحتية ككود قبل النشر.",status:"planned",tag:"IaC"},
   {name:"KICS",category:"السحابة والحاويات",description:"تحليل إعدادات IaC بحثاً عن أخطاء التهيئة.",status:"planned",tag:"IaC"},
   {name:"YARA-X",category:"تحليل البرمجيات",description:"مطابقة قواعد YARA-X لتحليل العينات في مختبر معزول.",status:"planned",tag:"Detection"},
-  {name:" capa",category:"تحليل البرمجيات",description:"استخراج القدرات والسلوكيات من الملفات التنفيذية.",status:"planned",tag:"Malware"}
+  {name:"CAPA",category:"تحليل البرمجيات",description:"استخراج القدرات والسلوكيات من الملفات التنفيذية.",status:"planned",tag:"Malware"}
 
 ];
 
