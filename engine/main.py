@@ -33,11 +33,13 @@ def check_target(value: str):
     return str(address)
 
 @app.get("/health")
-def health():
+def health(authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
     return {"status":"ok","engine":"nmap-safe-profile","allowlist_configured":bool(NETWORKS),"execution_enabled":bool(TOKEN and NETWORKS)}
 
 @app.get("/tools")
-def tools():
+def tools(authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
     return {"available":[{"name":"Nmap","state":"ready" if TOKEN and NETWORKS else "blocked_until_configured","profile":"service discovery; top ports only; no scripts or exploit modules"}]}
 
 @app.post("/scans/nmap")
