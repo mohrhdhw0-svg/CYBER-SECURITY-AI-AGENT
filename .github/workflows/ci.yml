@@ -27,8 +27,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate engine syntax
-        run: python -m compileall -q engine
+      - name: Validate engine and deployment script syntax
+        run: |
+          python -m compileall -q engine
+          bash -n engine/cloudrun/deploy.sh
       - name: Test engine authorization guards
         working-directory: engine
         run: |
