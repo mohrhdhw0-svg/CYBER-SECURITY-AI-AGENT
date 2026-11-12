@@ -28,4 +28,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate engine syntax
-        run: python -m compileall -q engine/main.py
+        run: python -m compileall -q engine
+      - name: Test engine authorization guards
+        working-directory: engine
+        run: |
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -v
