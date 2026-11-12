@@ -1,9 +1,10 @@
-import ipaddress, os, secrets, subprocess, xml.etree.ElementTree as ET
+import ipaddress, os, secrets, shutil, subprocess, xml.etree.ElementTree as ET
 from typing import Optional
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Cyber Security AI Agent Engine", version="0.1.0")
+app = FastAPI(title="Cyber Security AI Agent Engine", version="0.1.1")
+NMAP_PATH = shutil.which("nmap")
 TOKEN = os.environ.get("ENGINE_API_TOKEN", "")
 NETWORKS = []
 for item in os.environ.get("AUTHORIZED_CIDRS", "").split(","):
@@ -35,20 +36,23 @@ def check_target(value: str):
 @app.get("/health")
 def health(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
-    return {"status":"ok","engine":"nmap-safe-profile","allowlist_configured":bool(NETWORKS),"execution_enabled":bool(TOKEN and NETWORKS)}
+    ready = bool(TOKEN and NETWORKS and NMAP_PATH)
+    return {"status":"ok" if ready else "degraded","engine":"nmap-safe-profile","allowlist_configured":bool(NETWORKS),"nmap_available":bool(NMAP_PATH),"execution_enabled":ready}
 
 @app.get("/tools")
 def tools(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
-    return {"available":[{"name":"Nmap","state":"ready" if TOKEN and NETWORKS else "blocked_until_configured","profile":"service discovery; top ports only; no scripts or exploit modules"}]}
+    return {"available":[{"name":"Nmap","state":"ready" if TOKEN and NETWORKS and NMAP_PATH else "blocked_until_configured","binary_available":bool(NMAP_PATH),"profile":"service discovery; top ports only; no scripts or exploit modules"}]}
 
 @app.post("/scans/nmap")
 def nmap_scan(request: ScanRequest, authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
     if not request.confirm_authorized:
         raise HTTPException(status_code=400, detail="Explicit authorization confirmation is required.")
+    if not NMAP_PATH:
+        raise HTTPException(status_code=503, detail="Nmap binary is not installed in this engine image.")
     target = check_target(request.target_ip)
-    command = ["nmap","-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(request.top_ports),"-oX","-",target]
+    command = [NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(request.top_ports),"-oX","-",target]
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=90, check=False)
     except subprocess.TimeoutExpired:
