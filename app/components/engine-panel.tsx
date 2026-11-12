@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Activity, CircleAlert, CircleCheck, LoaderCircle, Radar, ShieldCheck } from "lucide-react";
 
 type Health = { configured?: boolean; status?: string; execution_enabled?: boolean; message?: string };
@@ -21,7 +21,7 @@ export default function EnginePanel() {
   }
   useEffect(()=>{ void refresh(); },[]);
 
-  async function runScan(e: React.FormEvent<HTMLFormElement>) {
+  async function runScan(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError(""); setResult(null);
     try {
       const r = await fetch("/api/engine/nmap",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_ip:target,authorization_reference:reference,confirm_authorized:confirmed,top_ports:100})});
