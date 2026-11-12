@@ -4,9 +4,10 @@ This is a separate Docker-hosted service; it does not run inside Vercel. The fir
 
 ## Run
 
-1. Copy `.env.example` to `.env` and set a long random `ENGINE_API_TOKEN`.
+1. Copy `.env.example` to `.env` and set a long random `ENGINE_API_TOKEN` (at least 32 random bytes).
 2. Replace `AUTHORIZED_CIDRS` with the exact lab IP/CIDR you own or are explicitly authorized to test. Do not use broad public ranges.
 3. Build and run: `docker build -t cyber-agent-engine ./engine` then `docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=128 --memory=512m --cpus=1 -p 127.0.0.1:8080:8080 --env-file engine/.env cyber-agent-engine`.
-4. Send `Authorization: Bearer <token>` to `/scans/nmap` with a literal IP, an authorization reference, and `confirm_authorized: true`.
+4. In Vercel, configure `ENGINE_URL` to the private/restricted engine HTTPS endpoint, `ENGINE_API_TOKEN` to the same engine token, and `SCAN_ACCESS_KEY` to a separate random secret of at least 20 characters. The dashboard requires this access key before it will submit a scan. Never commit these values.
+5. Send `Authorization: Bearer <token>` to `/scans/nmap` with a literal IP, an authorization reference, and `confirm_authorized: true`.
 
-The runner rejects targets outside `AUTHORIZED_CIDRS`, rejects hostnames, requires bearer authentication and explicit authorization confirmation, limits scans to top 10–100 TCP ports with service detection, and has a 90-second timeout. It does not invoke NSE scripts, exploit modules, password attacks, or arbitrary shell commands. Keep this API private behind a VPN or authenticated gateway; never expose it directly to the public internet. This is an initial adapter, not a full job queue or production multi-tenant service.
+The runner rejects targets outside `AUTHORIZED_CIDRS`, rejects hostnames, requires bearer authentication and explicit authorization confirmation. Health and tool metadata endpoints also require bearer authentication, limits scans to top 10–100 TCP ports with service detection, and has a 90-second timeout. It does not invoke NSE scripts, exploit modules, password attacks, or arbitrary shell commands. Keep this API private behind a VPN or authenticated gateway; never expose it directly to the public internet. This is an initial adapter, not a full job queue or production multi-tenant service.
