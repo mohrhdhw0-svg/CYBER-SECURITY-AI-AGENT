@@ -35,7 +35,7 @@ def valid_dynamic_permit(value: Optional[str], target: str) -> bool:
         return data.get("ip") == target and bool(data.get("id")) and isinstance(data.get("exp"), (int, float)) and data["exp"] > time.time() * 1000
     except Exception: return False
 
-def check_target(value: str, permit: Optional[str]):
+def check_target(value: str, permit: Optional[str] = None):
     try: address = ipaddress.ip_address(value)
     except ValueError: raise HTTPException(status_code=400, detail="Target must be a literal IP address.")
     if not address.is_global: raise HTTPException(status_code=400, detail="Only globally routable public IP addresses are eligible.")
@@ -112,3 +112,14 @@ def intel_scan(request: ScanRequest, authorization: Optional[str] = Header(defau
     passive=passive_intel(target)
     active=nmap_data(target,request.top_ports)
     return {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"approved-public-ip-intelligence","passive":passive,"ports":active["ports"],"summary":active["summary"],"limitations":["Only the 100 most common TCP ports are checked by default.","No exploit attempts, credential attacks, vulnerability exploitation, or intrusive NSE scripts are run.","Reputation data requires an optional AbuseIPDB API key."]}
+
+
+# Backward-compatible guarded endpoint retained for existing engine clients/tests.
+@app.post("/scans/nmap")
+def nmap_scan(request: ScanRequest, authorization: Optional[str] = Header(default=None), x_scan_approval: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    if not request.confirm_authorized:
+        raise HTTPException(status_code=400, detail="Explicit authorization confirmation is required.")
+    target = check_target(request.target_ip, x_scan_approval)
+    data = nmap_data(target, request.top_ports)
+    return {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"nmap-safe-profile","ports":data["ports"],"summary":data["summary"]}
