@@ -14,3 +14,14 @@ export async function setAdminSession(){const secret=process.env.ADMIN_SESSION_S
 export async function isAdmin(){const secret=process.env.ADMIN_SESSION_SECRET;if(!secret)return false;const value=(await cookies()).get("cyber_admin")?.value||"";const [payload,sig]=value.split(".");if(!payload||!sig||!validSecret(sig,sign(payload,secret)))return false;try{return JSON.parse(Buffer.from(payload,"base64url").toString()).exp>Date.now();}catch{return false;}}
 export function createScanPermit(ip:string,id:string,expiresAt:string){const secret=process.env.SCAN_APPROVAL_SECRET;if(!secret)throw new Error("Scan permit secret missing");const payload=Buffer.from(JSON.stringify({ip,id,exp:Date.parse(expiresAt)})).toString("base64url");return payload+"."+sign(payload,secret);}
 export function newId(){return randomBytes(18).toString("hex");}
+
+export async function checkLoginRateLimit(clientKey:string){
+ const key="admin:login:"+createHmac("sha256",process.env.ADMIN_SESSION_SECRET||"").update(clientKey).digest("hex");
+ const count=Number(await redis(["INCR",key]));
+ if(count===1)await redis(["EXPIRE",key,"900"]);
+ return {allowed:count<=5,remaining:Math.max(0,5-count)};
+}
+export async function clearLoginRateLimit(clientKey:string){
+ const key="admin:login:"+createHmac("sha256",process.env.ADMIN_SESSION_SECRET||"").update(clientKey).digest("hex");
+ await redis(["DEL",key]);
+}
