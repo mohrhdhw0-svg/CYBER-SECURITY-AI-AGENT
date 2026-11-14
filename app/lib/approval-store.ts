@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 const redisUrl=()=>process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/,"");
 const redisToken=()=>process.env.UPSTASH_REDIS_REST_TOKEN;
-export type ScanRequest={id:string;ip:string;status:"pending"|"approved"|"rejected"|"scanning"|"completed"|"failed";createdAt:string;expiresAt?:string;decisionAt?:string;authorizationReference?:string;result?:unknown;error?:string};
+export type ScanRequest={id:string;ip:string;status:"pending"|"approved"|"rejected"|"scanning"|"completed"|"failed";createdAt:string;expiresAt?:string;decisionAt?:string;authorizationReference?:string;ticketProof?:string;result?:unknown;error?:string};
 async function redis(command:string[]){const url=redisUrl(),token=redisToken();if(!url||!token)throw new Error("Approval storage is not configured.");const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(command),cache:"no-store"});if(!r.ok)throw new Error("Approval storage request failed.");const data=await r.json();if(data.error)throw new Error("Approval storage error.");return data.result;}
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
 export async function getRequest(id:string):Promise<ScanRequest|null>{const v=await redis(["GET",`scan:req:${id}`]);return v?JSON.parse(v):null;}
