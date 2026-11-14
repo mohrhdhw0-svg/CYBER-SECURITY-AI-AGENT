@@ -25,3 +25,10 @@ export async function clearLoginRateLimit(clientKey:string){
  const key="admin:login:"+createHmac("sha256",process.env.ADMIN_SESSION_SECRET||"").update(clientKey).digest("hex");
  await redis(["DEL",key]);
 }
+
+export async function claimScanLease(id:string,token:string){
+ return await redis(["SET",`scan:lease:${id}`,token,"NX","EX","240"])==="OK";
+}
+export async function releaseScanLease(id:string,token:string){
+ await redis(["EVAL","if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end","1",`scan:lease:${id}`,token]);
+}
