@@ -1,53 +1,27 @@
 "use client";
-
-import { useEffect, useState, type FormEvent } from "react";
-import { Activity, CircleAlert, CircleCheck, LoaderCircle, Radar, ShieldCheck } from "lucide-react";
-
-type Health = { configured?: boolean; status?: string; execution_enabled?: boolean; message?: string };
-type Scan = { status?: string; target?: string; authorization_reference?: string; ports?: Array<{port:string;protocol:string;state:string;service:string;product?:string|null;version?:string|null}>; summary?: {ports_observed:number}; error?: string; detail?: string };
-
-export default function EnginePanel() {
-  const [health,setHealth] = useState<Health | null>(null);
-  const [target,setTarget] = useState("");
-  const [reference,setReference] = useState("");
-  const [accessKey,setAccessKey] = useState("");
-  const [confirmed,setConfirmed] = useState(false);
-  const [busy,setBusy] = useState(false);
-  const [error,setError] = useState("");
-  const [result,setResult] = useState<Scan | null>(null);
-
-  async function refresh() {
-    try { const r = await fetch("/api/engine/health",{cache:"no-store"}); setHealth(await r.json()); }
-    catch { setHealth({status:"unreachable",message:"تعذر قراءة حالة المحرك."}); }
-  }
-  useEffect(()=>{ void refresh(); },[]);
-
-  async function runScan(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBusy(true); setError(""); setResult(null);
-    try {
-      const r = await fetch("/api/engine/nmap",{method:"POST",headers:{"Content-Type":"application/json","x-scan-access-key":accessKey},body:JSON.stringify({target_ip:target,authorization_reference:reference,confirm_authorized:confirmed,top_ports:100})});
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || data.detail || "فشل تنفيذ الفحص.");
-      setResult(data);
-    } catch (err) { setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع."); }
-    finally { setBusy(false); }
-  }
-
-  const ready = health?.status === "ok" && health?.execution_enabled === true;
-  return <section className="engine-panel" aria-labelledby="engine-title">
-    <div className="engine-heading"><div><div className="engine-kicker"><Activity size={14}/> LIVE ENGINE CONNECTIVITY</div><h2 id="engine-title">محرك الفحص الفعلي</h2><p>موصل Nmap محدود، يعمل عبر خدمة Docker منفصلة ولا ينفذ أوامر عامة.</p></div>
-      <span className={ready ? "engine-state ready" : "engine-state"}>{ready ? <CircleCheck size={14}/> : <CircleAlert size={14}/>} {ready ? "متصل ومهيأ" : "بانتظار إعداد المحرك"}</span>
-    </div>
-    <div className="engine-status"><span className={ready ? "status-led ready" : "status-led"}/><b>{health?.message || (ready ? "قائمة السماح مهيأة والتنفيذ متاح." : health?.status === "unreachable" ? "المحرك غير متاح حالياً." : "خدمة الفحص لم تُربط بعد.")}</b><button type="button" onClick={()=>void refresh()}>تحديث الحالة</button></div>
-    <form className="scan-form" onSubmit={runScan}>
-      <label>عنوان IPv4 للمختبر<input value={target} onChange={e=>setTarget(e.target.value)} placeholder="مثال: عنوان جهاز مختبرك" inputMode="decimal" required/></label>
-      <label>مفتاح تشغيل الفحص<input type="password" value={accessKey} onChange={e=>setAccessKey(e.target.value)} placeholder="أدخل مفتاح SCAN_ACCESS_KEY" autoComplete="off" required/></label>
-      <label>مرجع التفويض<input value={reference} onChange={e=>setReference(e.target.value)} placeholder="رقم موافقة المختبر أو وصفها" minLength={4} maxLength={120} required/></label>
-      <label className="authorization-check"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> أؤكد أن هذا الهدف أملكه أو لدي تفويض مكتوب لاختباره.</label>
-      <button className="scan-submit" type="submit" disabled={!ready || busy || !confirmed || !target || accessKey.length<20 || reference.trim().length<4}>{busy ? <><LoaderCircle className="spin" size={17}/> جارٍ تنفيذ الفحص...</> : <><Radar size={17}/> فحص الخدمات المصرح بها</>}</button>
-    </form>
-    {!ready && <div className="engine-help"><ShieldCheck size={17}/> لن يُرسل أي فحص قبل إعداد عنوان المحرك ورمزه السري وقائمة عناوين IP المسموح بها على الخادم الخاص.</div>}
-    {error && <div className="scan-error" role="alert">{error}</div>}
-    {result && <div className="scan-results"><h3>نتيجة الفحص — {result.target}</h3><p>الخدمات المرصودة: {result.summary?.ports_observed ?? result.ports?.length ?? 0}</p>{(result.ports || []).length ? <div className="scan-table-wrap"><table><thead><tr><th>المنفذ</th><th>الحالة</th><th>الخدمة</th><th>المنتج والإصدار</th></tr></thead><tbody>{result.ports?.map((p,i)=><tr key={p.protocol+p.port+i}><td>{p.port}/{p.protocol}</td><td>{p.state}</td><td>{p.service}</td><td>{[p.product,p.version].filter(Boolean).join(" ") || "غير محدد"}</td></tr>)}</tbody></table></div>:<p>لم تُرصد منافذ مفتوحة ضمن نطاق الفحص المحدد.</p>}</div>}
-  </section>;
+import {useEffect,useState,type FormEvent} from "react";
+import {Activity,CircleAlert,CircleCheck,LoaderCircle,ShieldCheck} from "lucide-react";
+type Health={status?:string;execution_enabled?:boolean;message?:string};
+type Intel={target?:string;passive?:{rdap?:any;routing?:any;reverse_dns?:any;reputation?:any;geo?:any;sources?:any[];warnings?:string[];collected_at?:string};ports?:Array<{port:string;protocol:string;state:string;service:string;product?:string|null;version?:string|null}>;summary?:{ports_observed:number;open_ports:number};limitations?:string[]};
+type RequestStatus={id:string;ip:string;status:string;expiresAt?:string;result?:Intel;error?:string};
+export default function EnginePanel(){
+ const [health,setHealth]=useState<Health|null>(null),[target,setTarget]=useState(""),[requestStatus,setRequestStatus]=useState<RequestStatus|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ async function refresh(){try{const r=await fetch("/api/engine/health",{cache:"no-store"});setHealth(await r.json())}catch{setHealth({status:"unreachable",message:"تعذر قراءة حالة المحرك."})}}
+ async function refreshApproval(){try{const r=await fetch("/api/scan-requests",{cache:"no-store"});const d=await r.json();if(r.ok){setRequestStatus(d.request);setTarget(d.request.ip)}}catch{}}
+ useEffect(()=>{void refresh();void refreshApproval()},[]);
+ useEffect(()=>{if(!requestStatus||!["pending","approved","scanning"].includes(requestStatus.status))return;const timer=setInterval(()=>void refreshApproval(),3000);return()=>clearInterval(timer)},[requestStatus?.id,requestStatus?.status]);
+ async function submitRequest(e:FormEvent){e.preventDefault();setBusy(true);setError("");setRequestStatus(null);try{const r=await fetch("/api/scan-requests",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ip:target})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر إرسال الطلب");await refreshApproval()}catch(x){setError(x instanceof Error?x.message:"حدث خطأ")}finally{setBusy(false)}}
+ const ready=health?.status==="ok"&&health?.execution_enabled===true,report=requestStatus?.result;
+ const passive=report?.passive;
+ return <section className="engine-panel" aria-labelledby="engine-title"><div className="engine-heading"><div><div className="engine-kicker"><Activity size={14}/> LIVE ENGINE CONNECTIVITY</div><h2 id="engine-title">محرك استخبارات عناوين IP</h2><p>أدخل عنوان IP فقط. بعد موافقة الإدارة يبدأ جمع المعلومات تلقائياً دون أي خطوة إضافية منك.</p></div><span className={ready?"engine-state ready":"engine-state"}>{ready?<CircleCheck size={14}/>:<CircleAlert size={14}/>} {ready?"المحرك متصل":"المحرك غير مهيأ"}</span></div>
+ <div className="engine-status"><span className={ready?"status-led ready":"status-led"}/><b>{health?.message||(ready?"المحرك جاهز وينتظر موافقة الإدارة.":"تحقق من إعداد المحرك ومخزن الطلبات.")}</b><button type="button" onClick={()=>void refresh()}>تحديث الحالة</button></div>
+ <form className="scan-form" onSubmit={submitRequest}><label>عنوان IPv4 عام تملكه أو لديك تفويض مكتوب لاختباره<input value={target} onChange={e=>setTarget(e.target.value)} placeholder="أدخل عنوان IP العام" inputMode="decimal" required/></label><button className="scan-submit" type="submit" disabled={busy||!target.trim()}>{busy?<><LoaderCircle className="spin" size={17}/> جارٍ الإرسال...</>:<><ShieldCheck size={17}/> إرسال طلب الفحص</>}</button></form>
+ {requestStatus&&<div className="engine-help"><b>حالة الطلب: {({pending:"بانتظار موافقة الإدارة",approved:"تمت الموافقة",scanning:"تمت الموافقة — يجري البحث تلقائياً",completed:"اكتمل البحث والتقرير جاهز",rejected:"تم رفض الطلب",failed:"تعذر إكمال البحث"} as Record<string,string>)[requestStatus.status]||requestStatus.status}</b><p>العنوان: {requestStatus.ip}</p>{requestStatus.status==="scanning"&&<p><LoaderCircle className="spin" size={15}/> يجري جمع معلومات الشبكة وفحص المنافذ المحددة...</p>}{requestStatus.error&&<p role="alert">{requestStatus.error}</p>}</div>}
+ {report&&<div className="scan-results"><h3>تقرير استخبارات IP — {report.target}</h3><p>وقت الجمع: {passive?.collected_at||"غير متاح"} · المنافذ المفتوحة: {report.summary?.open_ports??0} من {report.summary?.ports_observed??0} مرصود</p>
+ <h4>معلومات التسجيل والشبكة (RDAP)</h4><pre>{passive?.rdap?JSON.stringify({name:passive.rdap.name,handle:passive.rdap.handle,port43:passive.rdap.port43,remarks:passive.rdap.remarks,entities:passive.rdap.entities?.map((x:any)=>x.roles)},null,2):"لم تتوفر بيانات RDAP."}</pre>
+ <h4>ASN والتوجيه</h4><pre>{JSON.stringify(passive?.routing||{},null,2)}</pre><h4>الموقع التقريبي ومزود الشبكة</h4><pre>{JSON.stringify(passive?.geo||{},null,2)}</pre><h4>DNS العكسي</h4><pre>{JSON.stringify(passive?.reverse_dns||{},null,2)}</pre><h4>سمعة العنوان</h4><pre>{JSON.stringify(passive?.reputation||{},null,2)}</pre>
+ <h4>المنافذ والخدمات المكتشفة</h4>{(report.ports||[]).length?<div className="scan-table-wrap"><table><thead><tr><th>المنفذ</th><th>الحالة</th><th>الخدمة</th><th>المنتج والإصدار</th></tr></thead><tbody>{report.ports?.map((p,i)=><tr key={p.protocol+p.port+i}><td>{p.port}/{p.protocol}</td><td>{p.state}</td><td>{p.service}</td><td>{[p.product,p.version].filter(Boolean).join(" ")||"غير محدد"}</td></tr>)}</tbody></table></div>:<p>لم تُرصد منافذ ضمن النطاق المحدد.</p>}
+ <h4>مصادر وحدود التقرير</h4><ul>{(passive?.sources||[]).map((s:any)=><li key={s.name}>{s.name}</li>)}{(report.limitations||[]).map((s,i)=><li key={i}>{s}</li>)}{(passive?.warnings||[]).map((s,i)=><li key={"w"+i}>{s}</li>)}</ul></div>}
+ {!ready&&<div className="engine-help"><ShieldCheck size={17}/> الفحص الفعلي لن يعمل حتى تكتمل إعدادات المحرك ومخزن الطلبات والأسرار.</div>}{error&&<div className="scan-error" role="alert">{error}</div>}
+ </section>;
 }

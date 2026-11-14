@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "app/api/queues/process-scan/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "ip-scan-requests",
+          "retryAfterSeconds": 60
+        }
+      ]
+    }
+  }
+}

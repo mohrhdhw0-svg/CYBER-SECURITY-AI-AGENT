@@ -3,18 +3,18 @@ import unittest
 from unittest.mock import patch
 
 os.environ["ENGINE_API_TOKEN"] = "test-token"
-os.environ["AUTHORIZED_CIDRS"] = "192.0.2.10/32"
+os.environ["AUTHORIZED_CIDRS"] = "8.8.8.8/32"
 
 import main
 
 
 class EngineGuardTests(unittest.TestCase):
     def test_exact_allowlisted_ip_is_accepted(self):
-        self.assertEqual(main.check_target("192.0.2.10"), "192.0.2.10")
+        self.assertEqual(main.check_target("8.8.8.8"), "8.8.8.8")
 
     def test_ip_outside_allowlist_is_rejected(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("192.0.2.11")
+            main.check_target("8.8.4.4")
         self.assertEqual(ctx.exception.status_code, 403)
 
     def test_hostname_is_rejected(self):
@@ -45,7 +45,7 @@ class EngineGuardTests(unittest.TestCase):
 
     def test_scan_is_blocked_when_nmap_binary_is_missing(self):
         request = main.ScanRequest(
-            target_ip="192.0.2.10",
+            target_ip="8.8.8.8",
             authorization_reference="LAB-123",
             confirm_authorized=True,
         )
