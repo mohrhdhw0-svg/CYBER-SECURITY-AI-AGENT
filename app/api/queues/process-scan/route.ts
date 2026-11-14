@@ -20,9 +20,9 @@ export const POST=handleCallback(async(message:ScanMessage)=>{
   let response:Response;
   try{
    response=await fetch(`${base}/scans/intel`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`,"X-Scan-Approval":permit},body:JSON.stringify({target_ip:current.ip,authorization_reference:current.authorizationReference,confirm_authorized:true,top_ports:100}),cache:"no-store",signal:AbortSignal.timeout(115000)});
-  }catch(e){current.status="failed";current.error=e instanceof Error?e.message:"تعذر الاتصال بمحرك الفحص.";await updateRequest(current);return;}
+  }catch(e){throw new Error(e instanceof Error?`تعذر الاتصال بمحرك الفحص مؤقتاً: ${e.message}`:"تعذر الاتصال بمحرك الفحص مؤقتاً.");}
   const data=await response.json().catch(()=>({error:"استجابة غير مفهومة من المحرك."}));
-  if(!response.ok){current.status="failed";current.error=String(data.detail||data.error||"فشل محرك الفحص.");await updateRequest(current);return;}
+  if(!response.ok){if(response.status===408||response.status===429||response.status>=500)throw new Error(`محرك الفحص غير متاح مؤقتاً (HTTP ${response.status}).`);current.status="failed";current.error=String(data.detail||data.error||`فشل محرك الفحص (HTTP ${response.status}).`);await updateRequest(current);return;}
   current.status="completed";current.result=data;delete current.error;await updateRequest(current);
  }finally{await releaseScanLease(item.id,leaseToken);}
 },{visibilityTimeoutSeconds:180,retry:(error,metadata)=>metadata.deliveryCount>8?{acknowledge:true}:{afterSeconds:Math.min(300,metadata.deliveryCount*15)}});
