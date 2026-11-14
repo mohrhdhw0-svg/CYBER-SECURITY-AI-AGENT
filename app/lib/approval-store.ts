@@ -32,3 +32,11 @@ export async function claimScanLease(id:string,token:string){
 export async function releaseScanLease(id:string,token:string){
  await redis(["EVAL","if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end","1",`scan:lease:${id}`,token]);
 }
+
+/** Atomically move a pending request to scanning/rejected so concurrent admin actions cannot both win. */
+export async function transitionPendingRequest(item:ScanRequest){
+ const result=await redis(["EVAL",
+  "local raw=redis.call('GET', KEYS[1]); if not raw then return 0 end; local current=cjson.decode(raw); if current.status ~= 'pending' then return 0 end; redis.call('SET', KEYS[1], ARGV[1], 'EX', '604800'); return 1",
+  "1",`scan:req:${item.id}`,JSON.stringify(item)]);
+ return Number(result)===1;
+}
