@@ -1,44 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isIP } from "node:net";
-import { timingSafeEqual } from "node:crypto";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-export async function POST(request: NextRequest) {
-  const base = process.env.ENGINE_URL?.replace(/\/$/, "");
-  const token = process.env.ENGINE_API_TOKEN;
-  const scanKey = process.env.SCAN_ACCESS_KEY;
-  const suppliedKey = request.headers.get("x-scan-access-key") || "";
-  if (!base || !token || !scanKey) {
-    return NextResponse.json({ error: "محرك الفحص غير مهيأ. يجب ضبط أسرار الخادم أولاً." }, { status: 503 });
-  }
-  const expected = Buffer.from(scanKey);
-  const supplied = Buffer.from(suppliedKey);
-  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
-    return NextResponse.json({ error: "مفتاح الوصول غير صحيح." }, { status: 401 });
-  }
-  let body: { target_ip?: unknown; authorization_reference?: unknown; confirm_authorized?: unknown; top_ports?: unknown };
-  try { body = await request.json(); } catch { return NextResponse.json({ error: "طلب JSON غير صالح." }, { status: 400 }); }
-  if (typeof body.target_ip !== "string" || isIP(body.target_ip) !== 4) {
-    return NextResponse.json({ error: "أدخل عنوان IPv4 حرفياً؛ أسماء النطاقات غير مقبولة في هذا الموصل." }, { status: 400 });
-  }
-  if (typeof body.authorization_reference !== "string" || body.authorization_reference.trim().length < 4 || body.authorization_reference.length > 120) {
-    return NextResponse.json({ error: "أدخل مرجع تصريح صحيحاً (4 إلى 120 حرفاً)." }, { status: 400 });
-  }
-  if (body.confirm_authorized !== true) return NextResponse.json({ error: "يجب تأكيد امتلاك التصريح أو التفويض المكتوب." }, { status: 400 });
-  const topPorts = typeof body.top_ports === "number" ? Math.max(10, Math.min(100, Math.floor(body.top_ports))) : 100;
-  try {
-    const response = await fetch(`${base}/scans/nmap`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...body, target_ip: body.target_ip.trim(), authorization_reference: body.authorization_reference.trim(), top_ports: topPorts }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(100000),
-    });
-    const data = await response.json().catch(() => ({ error: "استجابة غير مفهومة من محرك الفحص." }));
-    return NextResponse.json(data, { status: response.status });
-  } catch {
-    return NextResponse.json({ error: "تعذر الوصول إلى محرك الفحص. تحقق من تشغيله وإعداد الشبكة الخاصة." }, { status: 502 });
-  }
-}
+import {NextRequest,NextResponse} from "next/server";
+import {isIPv4} from "node:net";
+import {getRequest,createScanPermit} from "@/app/lib/approval-store";
+export const runtime="nodejs";export const dynamic="force-dynamic";
+export async function POST(request:NextRequest){const base=process.env.ENGINE_URL?.replace(/\/$/,""),token=process.env.ENGINE_API_TOKEN;if(!base||!token||!process.env.SCAN_APPROVAL_SECRET)return NextResponse.json({error:"محرك الفحص أو نظام الموافقات غير مهيأ."},{status:503});let body:any;try{body=await request.json()}catch{return NextResponse.json({error:"طلب JSON غير صالح."},{status:400})}const ip=typeof body.target_ip==="string"?body.target_ip.trim():"";if(!isIPv4(ip)||typeof body.request_id!=="string")return NextResponse.json({error:"عنوان IP أو رقم الطلب غير صالح."},{status:400});try{const approval=await getRequest(body.request_id);if(!approval||approval.status!=="approved"||approval.ip!==ip||!approval.expiresAt||Date.parse(approval.expiresAt)<=Date.now())return NextResponse.json({error:"هذا العنوان لا يملك موافقة سارية من الإدارة."},{status:403});const permit=createScanPermit(ip,approval.id,approval.expiresAt);const response=await fetch(`${base}/scans/nmap`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`,"X-Scan-Approval":permit},body:JSON.stringify({target_ip:ip,authorization_reference:`admin-approved:${approval.id}`,confirm_authorized:true,top_ports:Math.max(10,Math.min(100,Number(body.top_ports)||100))}),cache:"no-store",signal:AbortSignal.timeout(100000)});const data=await response.json().catch(()=>({error:"استجابة غير مفهومة من المحرك."}));return NextResponse.json(data,{status:response.status})}catch{return NextResponse.json({error:"تعذر التحقق من الموافقة أو الاتصال بالمحرك."},{status:502})}}
