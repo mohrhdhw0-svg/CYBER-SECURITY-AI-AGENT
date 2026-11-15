@@ -101,7 +101,7 @@ class EngineGuardTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertNotIn("8.8.8.8", command)
         self.assertEqual(command[-2:], ["-iL", "-"])
-        self.assertEqual(run.call_args.kwargs["input"], "8.8.8.8\\n")
+        self.assertEqual(run.call_args.kwargs["input"], "8.8.8.8\n")
         self.assertFalse(run.call_args.kwargs["shell"])
         self.assertEqual(result["summary"]["open_ports"], 0)
 
