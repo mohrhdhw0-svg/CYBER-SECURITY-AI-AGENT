@@ -90,6 +90,21 @@ class EngineGuardTests(unittest.TestCase):
                 main.nmap_scan(request, "Bearer test-token", signed_permit("8.8.8.8"))
         self.assertEqual(ctx.exception.status_code, 503)
 
+    def test_nmap_receives_target_via_stdin_not_process_arguments(self):
+        completed = type("Completed", (), {
+            "returncode": 0,
+            "stdout": "<nmaprun><host><ports/></host></nmaprun>",
+            "stderr": "",
+        })()
+        with patch.object(main, "NMAP_PATH", "/usr/bin/nmap"), patch.object(main.subprocess, "run", return_value=completed) as run:
+            result = main.nmap_data("8.8.8.8", 100)
+        command = run.call_args.args[0]
+        self.assertNotIn("8.8.8.8", command)
+        self.assertEqual(command[-2:], ["-iL", "-"])
+        self.assertEqual(run.call_args.kwargs["input"], "8.8.8.8\\n")
+        self.assertFalse(run.call_args.kwargs["shell"])
+        self.assertEqual(result["summary"]["open_ports"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
