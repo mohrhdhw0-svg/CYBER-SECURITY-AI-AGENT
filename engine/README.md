@@ -1,18 +1,30 @@
-# Isolated Security Engine (initial)
+# Isolated Security Engine
 
-This is a separate Docker-hosted service; it does not run inside Vercel. The first real adapter is a constrained Nmap service-discovery profile.
+This Docker-hosted service runs separately from Vercel. The current adapter performs passive public-IP intelligence lookups and a bounded Nmap TCP/service scan. Every scan requires a short-lived, signed approval permit issued by the private admin workflow.
+
+## Required engine environment
+
+- `ENGINE_API_TOKEN`: long random bearer token shared with the Vercel server environment.
+- `SCAN_APPROVAL_SECRET`: long random HMAC secret shared with Vercel; it must match exactly.
+- `AUTHORIZED_CIDRS` (optional): comma-separated additional IP/CIDR restrictions. These restrictions can narrow which approved targets are accepted, but they never replace or bypass the per-request admin approval permit.
+- `ABUSEIPDB_API_KEY` (optional): enables reputation enrichment.
+
+Never commit real credentials. Configure the engine variables in the Docker host/Render service and the matching Vercel variables in the intended Vercel project.
 
 ## Run
 
-1. Copy `engine/.env.example` to `engine/.env` and set a long random `ENGINE_API_TOKEN` (at least 32 random bytes).
-2. Replace `AUTHORIZED_CIDRS` with the exact lab IP/CIDR you own or are explicitly authorized to test. Do not use broad public ranges.
-3. After the `Build and publish isolated scanner engine` GitHub Actions workflow succeeds, authenticate the host to GHCR with a token that has `read:packages`, then run `docker compose pull && docker compose up -d`. For a local build instead, run `docker compose up -d --build`.
-4. The Compose service pulls `ghcr.io/mohrhdhw0-svg/cyber-security-ai-agent-engine:latest` (or builds locally) and binds to 127.0.0.1 only. Vercel hosts the Next.js dashboard, not this persistent Docker scanner. Run the engine on a separate VPS or private server. Put it behind a VPN or authenticated HTTPS reverse proxy that permits requests only from your app/server; do not expose port 8080 directly. Configure Vercel server-side variables `ENGINE_URL` (the restricted HTTPS endpoint), `ENGINE_API_TOKEN` (the same random token configured on the engine), and `SCAN_ACCESS_KEY` (a separate random secret of at least 20 characters). The dashboard requires this access key before submitting a scan. Never commit these values.
-5. Send `Authorization: Bearer <token>` to `/scans/nmap` with a literal IP, an authorization reference, and `confirm_authorized: true`.
+1. Build and start the service using the repository's Docker Compose configuration or the published GHCR image.
+2. Keep the engine behind a private network, VPN, or authenticated HTTPS reverse proxy. Do not expose port 8080 directly to the public internet.
+3. Set Vercel `ENGINE_URL` to the restricted HTTPS endpoint and `ENGINE_API_TOKEN` / `SCAN_APPROVAL_SECRET` to the matching secrets.
+4. Configure the Vercel approval workflow's Redis and admin-session environment variables as documented in `docs/ADMIN-APPROVAL.md`.
 
-The runner rejects targets outside `AUTHORIZED_CIDRS`, rejects hostnames, requires bearer authentication and explicit authorization confirmation. Health and tool metadata endpoints also require bearer authentication, limits scans to top 10–100 TCP ports with service detection, and has a 90-second timeout. It does not invoke NSE scripts, exploit modules, password attacks, or arbitrary shell commands. Keep this API private behind a VPN or authenticated gateway; never expose it directly to the public internet. This is an initial adapter, not a full job queue or production multi-tenant service.
+## Authorization and scan limits
 
+- The engine requires a valid bearer token.
+- Every scan requires a short-lived HMAC permit bound to the exact public IP and approval expiry.
+- Private, loopback, link-local, multicast, reserved, and otherwise non-global IP addresses are rejected.
+- If `AUTHORIZED_CIDRS` is configured, the target must also fall inside one of those additional ranges.
+- Nmap is limited to the top 10–100 common TCP ports, conservative timing, service detection, and a bounded timeout.
+- No exploit attempts, credential attacks, arbitrary shell commands, or intrusive NSE scripts are run.
 
-## Image publication
-
-A push that changes `engine/**` starts `.github/workflows/engine-image.yml`. The workflow builds the image and publishes `latest` and the commit-SHA tag to GitHub Container Registry (GHCR). Confirm the workflow completed successfully and the package is visible before pulling it on the VPS. If the package is private, authenticate the VPS with a GitHub token that has `read:packages`.
+The engine's health and tool metadata endpoints also require bearer authentication. A successful application build does not by itself prove that the external engine, Redis, queue subscription, or end-to-end approval flow is operational.
