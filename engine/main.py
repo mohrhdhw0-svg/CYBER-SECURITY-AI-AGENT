@@ -39,9 +39,12 @@ def check_target(value: str, permit: Optional[str] = None):
     try: address = ipaddress.ip_address(value)
     except ValueError: raise HTTPException(status_code=400, detail="Target must be a literal IP address.")
     if not address.is_global: raise HTTPException(status_code=400, detail="Only globally routable public IP addresses are eligible.")
-    static_allowed = any(address.version == net.version and address in net for net in NETWORKS)
-    if not static_allowed and not valid_dynamic_permit(permit, str(address)):
+    # Every scan must carry a short-lived, IP-bound permit issued after admin approval.
+    # AUTHORIZED_CIDRS, when configured, is an additional restriction — never a bypass.
+    if not valid_dynamic_permit(permit, str(address)):
         raise HTTPException(status_code=403, detail="Target requires an active admin approval bound to this exact IP.")
+    if NETWORKS and not any(address.version == net.version and address in net for net in NETWORKS):
+        raise HTTPException(status_code=403, detail="Target is outside the engine's additional authorized CIDR restrictions.")
     return str(address)
 
 def fetch_json(url, headers=None, timeout=8):
@@ -96,7 +99,7 @@ def nmap_data(target, top_ports):
 @app.get("/health")
 def health(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
-    ready=bool(TOKEN and NMAP_PATH and (NETWORKS or PERMIT_SECRET))
+    ready=bool(TOKEN and NMAP_PATH and PERMIT_SECRET)
     return {"status":"ok" if ready else "degraded","engine":"nmap-plus-ip-intelligence","allowlist_configured":bool(NETWORKS),"dynamic_approval_configured":bool(PERMIT_SECRET),"nmap_available":bool(NMAP_PATH),"execution_enabled":ready}
 
 @app.get("/tools")
