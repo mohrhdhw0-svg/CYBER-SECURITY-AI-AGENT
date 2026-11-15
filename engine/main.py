@@ -86,7 +86,7 @@ def nmap_data(target, top_ports):
     # Keep untrusted target data out of process arguments entirely. Nmap reads
     # the already-validated literal IP from stdin via its documented -iL - mode.
     command=[NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(top_ports),"-oX","-","-iL","-"]
-    try: result=subprocess.run(command,input=target+"\\n",capture_output=True,text=True,timeout=90,check=False,shell=False)
+    try: result=subprocess.run(command,input=target+"\n",capture_output=True,text=True,timeout=90,check=False,shell=False)
     except subprocess.TimeoutExpired: raise HTTPException(status_code=408,detail="Scan timed out after 90 seconds.")
     if result.returncode not in (0,1): raise HTTPException(status_code=502,detail="Nmap execution failed; consult engine logs.")
     try:
