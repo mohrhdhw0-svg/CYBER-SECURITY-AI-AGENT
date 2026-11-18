@@ -97,10 +97,10 @@ class EngineGuardTests(unittest.TestCase):
             "stderr": "",
         })()
         with patch.object(main, "NMAP_PATH", "/usr/bin/nmap"), patch.object(main.subprocess, "run", return_value=completed) as run:
-            result = main.nmap_data("8.8.8.8", 100)
+            result = main.nmap_data("8.8.8.8", 10)
         command = run.call_args.args[0]
         self.assertNotIn("8.8.8.8", command)
-        self.assertEqual(command[-2:], ["-iL", "-"])
+        self.assertEqual(command[command.index("--top-ports") + 1], "100")\n        self.assertEqual(command[-2:], ["-iL", "-"])
         self.assertEqual(run.call_args.kwargs["input"], "8.8.8.8\n")
         self.assertFalse(run.call_args.kwargs["shell"])
         self.assertEqual(result["summary"]["open_ports"], 0)
