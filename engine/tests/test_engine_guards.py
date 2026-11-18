@@ -37,10 +37,23 @@ class EngineGuardTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
         self.assertEqual(main.check_target("8.8.8.8", signed_permit("8.8.8.8")), "8.8.8.8")
 
-    def test_ip_outside_additional_cidr_restriction_is_rejected_even_with_approval(self):
+    def test_ip_outside_authorized_cidr_restriction_is_rejected_even_with_approval(self):
         with self.assertRaises(main.HTTPException) as ctx:
             main.check_target("8.8.4.4", signed_permit("8.8.4.4"))
         self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_empty_allowlist_blocks_scanning_even_with_admin_permit(self):
+        with patch.object(main, "NETWORKS", []):
+            with self.assertRaises(main.HTTPException) as ctx:
+                main.check_target("8.8.8.8", signed_permit("8.8.8.8"))
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    def test_health_is_degraded_when_authorized_cidr_allowlist_is_missing(self):
+        with patch.object(main, "NETWORKS", []):
+            result = main.health("Bearer test-token")
+        self.assertEqual(result["status"], "degraded")
+        self.assertFalse(result["allowlist_configured"])
+        self.assertFalse(result["execution_enabled"])
 
     def test_permit_bound_to_exact_ip(self):
         with self.assertRaises(main.HTTPException) as ctx:
