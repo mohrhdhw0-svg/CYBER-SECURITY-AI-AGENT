@@ -17,8 +17,7 @@ export function newId(){return randomBytes(18).toString("hex");}
 
 export async function checkLoginRateLimit(clientKey:string){
  const key="admin:login:"+createHmac("sha256",process.env.ADMIN_SESSION_SECRET||"").update(clientKey).digest("hex");
- const count=Number(await redis(["INCR",key]));
- if(count===1)await redis(["EXPIRE",key,"900"]);
+ const count=Number(await redis(["EVAL","local count=redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return count","1",key,"900"]));
  return {allowed:count<=5,remaining:Math.max(0,5-count)};
 }
 export async function clearLoginRateLimit(clientKey:string){

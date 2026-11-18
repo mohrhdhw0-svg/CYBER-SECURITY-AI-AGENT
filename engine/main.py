@@ -85,8 +85,9 @@ def nmap_data(target, top_ports):
     if not NMAP_PATH: raise HTTPException(status_code=503, detail="Nmap binary is not installed in this engine image.")
     # Keep untrusted target data out of process arguments entirely. Nmap reads
     # the already-validated literal IP from stdin via its documented -iL - mode.
-    # Keep request data out of the process argument vector. The scan profile is fixed at 100 TCP ports.
-    command=[NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports","100","-oX","-","-iL","-"]
+    # The request schema bounds this profile to 10–100 common TCP ports.
+    port_limit = max(10, min(100, int(top_ports)))
+    command=[NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(port_limit),"-oX","-","-iL","-"]
     try: result=subprocess.run(command,input=target+"\n",capture_output=True,text=True,timeout=90,check=False,shell=False)
     except subprocess.TimeoutExpired: raise HTTPException(status_code=408,detail="Scan timed out after 90 seconds.")
     if result.returncode not in (0,1): raise HTTPException(status_code=502,detail="Nmap execution failed; consult engine logs.")

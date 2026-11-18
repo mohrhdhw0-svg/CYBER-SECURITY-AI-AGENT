@@ -100,7 +100,7 @@ class EngineGuardTests(unittest.TestCase):
             result = main.nmap_data("8.8.8.8", 10)
         command = run.call_args.args[0]
         self.assertNotIn("8.8.8.8", command)
-        self.assertEqual(command[command.index("--top-ports") + 1], "100")
+        self.assertEqual(command[command.index("--top-ports") + 1], "10")
         self.assertEqual(command[-2:], ["-iL", "-"])
         self.assertEqual(run.call_args.kwargs["input"], "8.8.8.8\n")
         self.assertFalse(run.call_args.kwargs["shell"])

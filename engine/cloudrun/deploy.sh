@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 : "${GCP_PROJECT_ID:?Set GCP_PROJECT_ID to your Google Cloud project ID}"
 : "${ENGINE_API_TOKEN:?Set ENGINE_API_TOKEN to a long random secret (at least 32 bytes)}"
+: "${SCAN_APPROVAL_SECRET:?Set SCAN_APPROVAL_SECRET to the exact Vercel HMAC secret (at least 32 bytes)}"
 : "${AUTHORIZED_CIDRS:?Set AUTHORIZED_CIDRS to the exact lab IP/CIDR you are authorized to test}"
 
 GCP_REGION="${GCP_REGION:-us-central1}"
@@ -36,8 +37,10 @@ ensure_secret() {
 }
 
 ensure_secret "cyber-engine-api-token"
+ensure_secret "cyber-engine-scan-approval-secret"
 ensure_secret "cyber-engine-authorized-cidrs"
 printf '%s' "$ENGINE_API_TOKEN" | gcloud secrets versions add cyber-engine-api-token --data-file=- --project "$GCP_PROJECT_ID"
+printf '%s' "$SCAN_APPROVAL_SECRET" | gcloud secrets versions add cyber-engine-scan-approval-secret --data-file=- --project "$GCP_PROJECT_ID"
 printf '%s' "$AUTHORIZED_CIDRS" | gcloud secrets versions add cyber-engine-authorized-cidrs --data-file=- --project "$GCP_PROJECT_ID"
 
 if [[ -z "$RUNTIME_SERVICE_ACCOUNT" ]]; then
@@ -45,7 +48,7 @@ if [[ -z "$RUNTIME_SERVICE_ACCOUNT" ]]; then
   RUNTIME_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 fi
 
-for secret in cyber-engine-api-token cyber-engine-authorized-cidrs; do
+for secret in cyber-engine-api-token cyber-engine-scan-approval-secret cyber-engine-authorized-cidrs; do
   gcloud secrets add-iam-policy-binding "$secret" \
     --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
     --role="roles/secretmanager.secretAccessor" \
@@ -66,7 +69,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --concurrency 1 \
   --min 0 \
   --max 1 \
-  --set-secrets "ENGINE_API_TOKEN=cyber-engine-api-token:latest,AUTHORIZED_CIDRS=cyber-engine-authorized-cidrs:latest" \
+  --set-secrets "ENGINE_API_TOKEN=cyber-engine-api-token:latest,SCAN_APPROVAL_SECRET=cyber-engine-scan-approval-secret:latest,AUTHORIZED_CIDRS=cyber-engine-authorized-cidrs:latest" \
   --quiet
 
 SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" --region "$GCP_REGION" --format='value(status.url)')"
