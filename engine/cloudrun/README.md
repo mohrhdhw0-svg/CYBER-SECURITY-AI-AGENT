@@ -10,6 +10,7 @@ This is an optional deployment path for the isolated Nmap engine. It creates or 
 - Permissions to deploy Cloud Run services, build source, create/update secrets, and grant Secret Manager access to the runtime service account.
 - An exact lab IP/CIDR that you own or have written authorization to test. Do not use broad public ranges.
 - A strong `ENGINE_API_TOKEN` (at least 32 random bytes).
+- `SCAN_APPROVAL_SECRET`, exactly matching the Vercel project value (at least 32 random bytes).
 
 ## Deploy
 
@@ -19,11 +20,12 @@ From the repository root, run:
 export GCP_PROJECT_ID="your-project-id"
 export GCP_REGION="us-central1"
 export ENGINE_API_TOKEN="$(openssl rand -hex 32)"
+export SCAN_APPROVAL_SECRET="<use the exact SCAN_APPROVAL_SECRET already configured in Vercel>"
 export AUTHORIZED_CIDRS="192.0.2.10/32" # Replace with your authorized lab IP/CIDR
 bash engine/cloudrun/deploy.sh
 ```
 
-The example CIDR is documentation-only TEST-NET space and must be replaced. The script rejects a default route (/0), validates CIDR syntax, stores the engine token and allowlist in Secret Manager, grants the Cloud Run runtime service account access to those two secrets, then deploys with 2 vCPU, 2 GiB memory, 120-second request timeout, concurrency 1, and maximum 1 instance. Minimum instances is zero to avoid idle-instance charges. Actual charges still depend on usage and Google Cloud pricing.
+The example CIDR is documentation-only TEST-NET space and must be replaced. The script rejects a default route (/0), validates CIDR syntax, stores the engine token, approval HMAC secret, and allowlist in Secret Manager, grants the Cloud Run runtime service account access to those three secrets, then deploys with 2 vCPU, 2 GiB memory, 120-second request timeout, concurrency 1, and maximum 1 instance. Minimum instances is zero to avoid idle-instance charges. Actual charges still depend on usage and Google Cloud pricing.
 
 The service is reachable over HTTPS and uses application-level bearer authentication. Because the Vercel application currently sends a bearer token rather than a Google identity token, the script enables unauthenticated Cloud Run invocation. **Do not treat the URL as private**: the engine bearer token is the access boundary. Keep it secret, use a separate `SCAN_ACCESS_KEY` in Vercel, and never expose either value in browser code or Git.
 

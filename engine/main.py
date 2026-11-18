@@ -40,11 +40,13 @@ def check_target(value: str, permit: Optional[str] = None):
     except ValueError: raise HTTPException(status_code=400, detail="Target must be a literal IP address.")
     if not address.is_global: raise HTTPException(status_code=400, detail="Only globally routable public IP addresses are eligible.")
     # Every scan must carry a short-lived, IP-bound permit issued after admin approval.
-    # AUTHORIZED_CIDRS, when configured, is an additional restriction — never a bypass.
+    if not NETWORKS:
+        raise HTTPException(status_code=503, detail="The engine's authorized CIDR allowlist is not configured.")
+    # The exact network allowlist is mandatory; admin approval cannot widen it.
     if not valid_dynamic_permit(permit, str(address)):
         raise HTTPException(status_code=403, detail="Target requires an active admin approval bound to this exact IP.")
-    if NETWORKS and not any(address.version == net.version and address in net for net in NETWORKS):
-        raise HTTPException(status_code=403, detail="Target is outside the engine's additional authorized CIDR restrictions.")
+    if not any(address.version == net.version and address in net for net in NETWORKS):
+        raise HTTPException(status_code=403, detail="Target is outside the engine's authorized CIDR restrictions.")
     return str(address)
 
 def fetch_json(url, headers=None, timeout=8):
@@ -85,8 +87,9 @@ def nmap_data(target, top_ports):
     if not NMAP_PATH: raise HTTPException(status_code=503, detail="Nmap binary is not installed in this engine image.")
     # Keep untrusted target data out of process arguments entirely. Nmap reads
     # the already-validated literal IP from stdin via its documented -iL - mode.
-    # Keep request data out of the process argument vector. The scan profile is fixed at 100 TCP ports.
-    command=[NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports","100","-oX","-","-iL","-"]
+    # The request schema bounds this profile to 10–100 common TCP ports.
+    port_limit = max(10, min(100, int(top_ports)))
+    command=[NMAP_PATH,"-n","-sT","-sV","-T2","--max-retries","2","--host-timeout","85s","--top-ports",str(port_limit),"-oX","-","-iL","-"]
     try: result=subprocess.run(command,input=target+"\n",capture_output=True,text=True,timeout=90,check=False,shell=False)
     except subprocess.TimeoutExpired: raise HTTPException(status_code=408,detail="Scan timed out after 90 seconds.")
     if result.returncode not in (0,1): raise HTTPException(status_code=502,detail="Nmap execution failed; consult engine logs.")
@@ -102,7 +105,7 @@ def nmap_data(target, top_ports):
 @app.get("/health")
 def health(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
-    ready=bool(TOKEN and NMAP_PATH and PERMIT_SECRET)
+    ready=bool(TOKEN and NMAP_PATH and PERMIT_SECRET and NETWORKS)
     return {"status":"ok" if ready else "degraded","engine":"nmap-plus-ip-intelligence","allowlist_configured":bool(NETWORKS),"dynamic_approval_configured":bool(PERMIT_SECRET),"nmap_available":bool(NMAP_PATH),"execution_enabled":ready}
 
 @app.get("/tools")

@@ -21,6 +21,8 @@ jobs:
           node-version: 22
       - name: Install web dependencies
         run: npm install
+      - name: Lint Next.js application
+        run: npm run lint
       - name: Build Next.js application
         run: npm run build
       - name: Setup Python
