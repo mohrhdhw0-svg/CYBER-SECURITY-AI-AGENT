@@ -73,7 +73,7 @@ export async function fetchAssistantCompletion({
     const answer = typeof raw === "string"
       ? raw.trim()
       : Array.isArray(raw)
-        ? raw.map((part) => part?.type === "text" ? part.text || "" : "").join("\n").trim()
+        ? raw.filter((part) => part?.type === "text").map((part) => typeof part.text === "string" ? part.text : "").join("\n").trim()
         : "";
 
     if (!answer) return { ok: false, status: 502, reason: "empty_answer" };
