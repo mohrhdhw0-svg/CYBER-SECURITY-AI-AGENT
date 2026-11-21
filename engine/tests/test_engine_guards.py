@@ -169,6 +169,7 @@ class EngineGuardTests(unittest.TestCase):
             "status": "completed",
             "target": "8.8.8.8",
             "authorization_reference": AUTH_REF,
+            "profile": "approved-public-ip-intelligence",
             "ports": [],
         }
         with patch.object(main, "redis_command", side_effect=fake_redis):
