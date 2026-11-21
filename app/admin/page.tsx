@@ -6,5 +6,28 @@ async function load(){const r=await fetch("/api/admin/requests",{cache:"no-store
 async function login(e:React.FormEvent){e.preventDefault();setBusy(true);setError("");try{const r=await fetch("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});const d=await r.json();if(!r.ok)throw new Error(d.error);setLogged(true);setPassword("");await load()}catch(x){setError(x instanceof Error?x.message:"فشل الدخول")}finally{setBusy(false)}}
 async function decide(id:string,action:"approve"|"reject"){setBusy(true);setError("");try{const r=await fetch("/api/admin/requests",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action})});const d=await r.json();if(!r.ok)throw new Error(d.error);await load()}catch(x){setError(x instanceof Error?x.message:"تعذر تنفيذ القرار")}finally{setBusy(false)}}
 async function logout(){await fetch("/api/admin/logout",{method:"POST"});setLogged(false);setRows([])}
-useEffect(()=>{if(logged)void load().catch(e=>setError(e.message))},[logged]);
+useEffect(() => {
+  let cancelled = false;
+  void fetch("/api/admin/requests", { cache: "no-store" })
+    .then(async (response) => {
+      if (response.status === 401) return null;
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "تعذر تحميل الطلبات");
+      return data;
+    })
+    .then((data) => {
+      if (!cancelled && data) {
+        setLogged(true);
+        setRows(data.requests || []);
+      }
+    })
+    .catch((cause) => {
+      if (!cancelled) {
+        setError(cause instanceof Error ? cause.message : "تعذر تحميل الطلبات");
+      }
+    });
+  return () => {
+    cancelled = true;
+  };
+}, []);
 return <main style={{maxWidth:1000,margin:"48px auto",padding:24,color:"var(--foreground)"}}><h1>لوحة الإدارة السرية</h1><p>مراجعة طلبات فحص عناوين IP. الموافقة صالحة لمدة 24 ساعة ومقيدة بالعنوان نفسه.</p>{!logged?<form onSubmit={login} style={{display:"grid",gap:12,maxWidth:420}}><label>كلمة مرور الإدارة<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><button disabled={busy} type="submit">دخول آمن</button></form>:<><button onClick={logout}>تسجيل الخروج</button><button onClick={()=>void load()} style={{marginInlineStart:8}}>تحديث</button><div style={{display:"grid",gap:12,marginTop:24}}>{rows.map(row=><article key={row.id} style={{padding:16,border:"1px solid #7776",borderRadius:12}}><b>{row.ip}</b><p>الحالة: {row.status} · وقت الطلب: {new Date(row.createdAt).toLocaleString("ar")}</p>{row.expiresAt&&<p>تنتهي الموافقة: {new Date(row.expiresAt).toLocaleString("ar")}</p>}{row.status==="pending"&&<div style={{display:"flex",gap:8}}><button disabled={busy} onClick={()=>void decide(row.id,"approve")}>موافقة لمدة 24 ساعة</button><button disabled={busy} onClick={()=>void decide(row.id,"reject")}>رفض</button></div>}</article>)}{!rows.length&&<p>لا توجد طلبات حتى الآن.</p>}</div></>}{error&&<p role="alert" style={{color:"tomato"}}>{error}</p>}</main>}
