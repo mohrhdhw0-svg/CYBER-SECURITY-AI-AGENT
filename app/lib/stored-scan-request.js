@@ -80,7 +80,10 @@ export function parseStoredRequest(value, expectedId) {
   if (item.error !== undefined && (typeof item.error !== "string" || item.error.length > 1_000)) {
     throw new Error("Stored approval error is invalid.");
   }
-  if ((item.result !== undefined && item.status !== "completed") || (item.status === "completed" && item.result === undefined)) {\n    throw new Error("Stored request status and scan result are inconsistent.");\n  }\n  if (item.result !== undefined && !validScanResult(item.result, item.ip, item.authorizationReference)) {
+  if ((item.result !== undefined && item.status !== "completed") || (item.status === "completed" && item.result === undefined)) {
+    throw new Error("Stored request status and scan result are inconsistent.");
+  }
+  if (item.result !== undefined && !validScanResult(item.result, item.ip, item.authorizationReference)) {
     throw new Error("Stored scan result failed validation.");
   }
   return item;
