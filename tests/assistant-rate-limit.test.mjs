@@ -34,6 +34,7 @@ test("allows the fifteenth request and blocks the sixteenth", async () => {
   globalThis.fetch = async (_url, init) => {
     assert.equal(init.method, "POST");
     assert.equal(init.cache, "no-store");
+    assert.equal(init.redirect, "error");
     assert.equal(init.headers.Authorization, "Bearer test-token");
     const command = JSON.parse(init.body);
     assert.equal(command[0], "EVAL");
