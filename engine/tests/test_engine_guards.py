@@ -17,7 +17,7 @@ import main
 def signed_permit(ip, exp=None):
     payload = {
         "ip": ip,
-        "id": "test-request-id",
+        "id": "a" * 36,
         "exp": exp if exp is not None else int((time.time() + 300) * 1000),
     }
     encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
@@ -119,6 +119,31 @@ class EngineGuardTests(unittest.TestCase):
         self.assertFalse(run.call_args.kwargs["shell"])
         self.assertEqual(result["summary"]["open_ports"], 0)
 
+
+    def test_permit_requires_uuid_format_request_id(self):
+        payload = {
+            "ip": "8.8.8.8",
+            "id": "not-a-request-id",
+            "exp": int((time.time() + 300) * 1000),
+        }
+        encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+        signature = hmac.new(os.environ["SCAN_APPROVAL_SECRET"].encode(), encoded.encode(), hashlib.sha256).digest()
+        permit = encoded + "." + base64.urlsafe_b64encode(signature).decode().rstrip("=")
+        self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8"))
+
+    def test_permit_expiry_must_be_integer_not_boolean_or_float(self):
+        for expiry in (True, time.time() * 1000 + 300_000):
+            payload = {"ip": "8.8.8.8", "id": "a" * 36, "exp": expiry}
+            encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+            signature = hmac.new(os.environ["SCAN_APPROVAL_SECRET"].encode(), encoded.encode(), hashlib.sha256).digest()
+            permit = encoded + "." + base64.urlsafe_b64encode(signature).decode().rstrip("=")
+            self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8"))
+
+    def test_permit_is_bound_to_admin_approval_reference(self):
+        permit = signed_permit("8.8.8.8")
+        self.assertTrue(main.valid_dynamic_permit(permit, "8.8.8.8", "admin-approved:" + "a" * 36))
+        self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "admin-approved:" + "b" * 36))
+        self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "unrelated-reference"))
 
 if __name__ == "__main__":
     unittest.main()
