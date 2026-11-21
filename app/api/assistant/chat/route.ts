@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit.js";
+import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
 import { fetchAssistantCompletion } from "@/app/lib/assistant-provider.js";
 
