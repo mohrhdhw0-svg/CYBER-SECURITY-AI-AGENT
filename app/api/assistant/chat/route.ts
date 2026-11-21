@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = `أنت Cyber AI Assistant، المساعد التعليم
 أنت مساعد محادثة فقط: لا تملك وصولاً مباشراً إلى أدوات الفحص أو ملفات المستخدم أو الإنترنت من خلال هذه الواجهة.`;
 
 function jsonError(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
+  return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET() {
@@ -29,7 +29,7 @@ export async function GET() {
   return NextResponse.json({
     configured,
     provider: configured ? "openai-compatible" : null,
-    message: configured ? "اكتملت إعدادات مزود الذكاء الاصطناعي والحماية." : "يلزم إعداد AI_API_BASE_URL وAI_API_KEY وAI_MODEL، مع إعداد Redis وحماية الجلسات."
+    message: configured ? "إعدادات مزود الذكاء الاصطناعي والحماية موجودة؛ لم يتم اختبار الاتصال بعد." : "يلزم إعداد AI_API_BASE_URL وAI_API_KEY وAI_MODEL، مع إعداد Redis وحماية الجلسات."
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     return jsonError("مصدر الطلب غير مسموح.", 403);
   }
 
-  const baseUrl = process.env.AI_API_BASE_URL?.replace(/\/$/, "");
+  const baseUrl = process.env.AI_API_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
   const model = process.env.AI_MODEL;
   if (!baseUrl || !apiKey || !model) {
@@ -48,15 +48,28 @@ export async function POST(request: NextRequest) {
 
   let endpoint: URL;
   try {
-    endpoint = new URL(`${baseUrl}/chat/completions`);
-    if (endpoint.protocol !== "https:" && endpoint.hostname !== "localhost" && endpoint.hostname !== "127.0.0.1") {
-      return jsonError("يجب أن يستخدم عنوان بوابة الذكاء الاصطناعي اتصال HTTPS.", 503);
+    const base = new URL(baseUrl);
+    const localDevelopmentHost = ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname);
+    if (base.username || base.password || base.search || base.hash) {
+      return jsonError("يجب أن يحتوي AI_API_BASE_URL على عنوان أساسي فقط دون بيانات دخول أو query أو hash.", 503);
     }
+    if (base.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && base.protocol === "http:" && localDevelopmentHost)) {
+      return jsonError("يجب أن يستخدم عنوان بوابة الذكاء الاصطناعي HTTPS في بيئة الإنتاج.", 503);
+    }
+    base.pathname = `${base.pathname.replace(/\/+$/, "")}/chat/completions`;
+    endpoint = base;
   } catch {
     return jsonError("قيمة AI_API_BASE_URL غير صالحة.", 503);
   }
 
-  const clientKey = (request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim().slice(0, 100);
+  // Vercel overwrites its forwarded client-IP header at the edge to prevent spoofing.
+  const clientKey = (
+    request.headers.get("x-vercel-forwarded-for") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for") ||
+    "unknown"
+  ).split(",")[0].trim().slice(0, 100);
+
   try {
     const limit = await checkAssistantRateLimit(clientKey);
     if (!limit.allowed) return jsonError("تم بلوغ حد المحادثات المؤقت. حاول مجدداً بعد 10 دقائق.", 429);
@@ -97,6 +110,7 @@ export async function POST(request: NextRequest) {
         stream: false
       }),
       cache: "no-store",
+      redirect: "error",
       signal: AbortSignal.timeout(45000)
     });
 
