@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 const redisUrl=()=>process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/,"");
 const redisToken=()=>process.env.UPSTASH_REDIS_REST_TOKEN;
 export type ScanRequest={id:string;ip:string;status:"pending"|"approved"|"rejected"|"scanning"|"completed"|"failed";createdAt:string;expiresAt?:string;decisionAt?:string;authorizationReference?:string;ticketProof?:string;result?:unknown;error?:string};
-async function redis(command:string[]){
+async function redis(command:string[],maxResponseBytes=16_384){
  const rawUrl=redisUrl(),token=redisToken();
  if(!rawUrl||!token)throw new Error("Approval storage is not configured.");
  let endpoint:URL;
@@ -25,7 +25,7 @@ async function redis(command:string[]){
  });
  if(!response.ok){await response.body?.cancel().catch(()=>{});throw new Error("Approval storage request failed.");}
  const declaredLength=Number(response.headers.get("content-length")||0);
- if(Number.isFinite(declaredLength)&&declaredLength>16_384){
+ if(Number.isFinite(declaredLength)&&declaredLength>maxResponseBytes){
   await response.body?.cancel().catch(()=>{});
   throw new Error("Approval storage response is too large.");
  }
@@ -38,7 +38,7 @@ async function redis(command:string[]){
    const {done,value}=await reader.read();
    if(done)break;
    total+=value.byteLength;
-   if(total>16_384){await reader.cancel();throw new Error("Approval storage response is too large.");}
+   if(total>maxResponseBytes){await reader.cancel();throw new Error("Approval storage response is too large.");}
    text+=decoder.decode(value,{stream:true});
   }
   text+=decoder.decode();
@@ -51,7 +51,7 @@ async function redis(command:string[]){
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
 export async function getRequest(id:string):Promise<ScanRequest|null>{
  if(!/^[a-f0-9]{36}$/.test(id))return null;
- const value=await redis(["GET",`scan:req:${id}`]);
+ const value=await redis(["GET",`scan:req:${id}`],1_100_000);
  return value===null||value===undefined?null:parseStoredRequest(value,id);
 }
 export type AdminScanRequest = Pick<ScanRequest, "id" | "ip" | "status" | "createdAt" | "expiresAt">;
