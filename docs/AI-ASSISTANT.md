@@ -15,6 +15,14 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 
 **Important deployment constraint:** FreeLLMAPI describes itself as a single-user, trusted-network tool, not a production or multi-tenant service. Do not expose its dashboard or raw gateway publicly, and do not treat one personal free-tier key as permission to serve an unrestricted public audience. Before a public launch, use an inference provider and account plan whose terms explicitly allow this application and its intended users, or implement a separately reviewed multi-tenant gateway. The MIT license permits code reuse subject to its notice requirements, but does not override upstream model-provider terms.
 
+## Security controls
+
+- Provider credentials are read only by the server route and are never returned by the status endpoint.
+- Production provider URLs must use HTTPS; local HTTP is allowed only during non-production development.
+- Provider redirects are rejected so the bearer credential is not sent through an unexpected redirect.
+- On Vercel, the rate limiter prefers `x-vercel-forwarded-for`, which Vercel documents as its edge-derived client IP header. For other hosting platforms, verify that the configured proxy overwrites forwarded-IP headers before trusting them.
+- Redis rate limiting fails closed if its configuration or service is unavailable.
+
 ## Limits and behavior
 
 - Maximum 12 conversation messages per request.
@@ -24,6 +32,7 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 - Conversation state is held in the browser session and is not persisted to the database.
 - The system prompt restricts the assistant to defensive, educational, and authorized-lab guidance.
 - The chat does not have access to the platform's scanner or other tools.
+- The status endpoint reports whether required settings exist; it does not prove that Redis or the AI provider is reachable or that credentials are valid.
 
 ## Deployment
 
