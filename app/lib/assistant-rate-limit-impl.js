@@ -55,9 +55,14 @@ export async function checkAssistantRateLimit(clientKey) {
   if (!response.ok) throw new Error("Assistant rate-limit storage request failed.");
   const result = await response.json();
   if (result.error) throw new Error("Assistant rate-limit storage returned an error.");
-  const count = Number(result.result);
+  const count = result.result;
+  // Upstash returns the Redis integer as a JSON number. Reject null,
+  // strings, fractions, and unsafe integers rather than coercing them to 0.
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error("Assistant rate-limit storage returned an invalid counter.");
+  }
   return {
-    allowed: Number.isFinite(count) && count <= 15,
-    remaining: Number.isFinite(count) ? Math.max(0, 15 - count) : 0,
+    allowed: count <= 15,
+    remaining: Math.max(0, 15 - count),
   };
 }
