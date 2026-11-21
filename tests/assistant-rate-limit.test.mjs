@@ -84,3 +84,44 @@ test("treats an invalid Redis counter as blocked", async () => {
     restore();
   }
 });
+
+
+test("rejects non-HTTPS Redis endpoints in production before sending credentials", async () => {
+  const restore = setTestEnvironment();
+  const previousNodeEnv = process.env.NODE_ENV;
+  const originalFetch = globalThis.fetch;
+  process.env.NODE_ENV = "production";
+  process.env.UPSTASH_REDIS_REST_URL = "http://redis.example";
+  let called = false;
+  globalThis.fetch = async () => { called = true; return Response.json({ result: 1 }); };
+  try {
+    await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /must use a valid HTTPS URL/);
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    restore();
+  }
+});
+
+test("rejects Redis URLs containing embedded credentials or query parameters", async () => {
+  const restore = setTestEnvironment();
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => { called = true; return Response.json({ result: 1 }); };
+  try {
+    for (const invalidUrl of [
+      "https://user:password@redis.example",
+      "https://redis.example?redirect=https://attacker.example",
+      "https://redis.example#fragment",
+    ]) {
+      process.env.UPSTASH_REDIS_REST_URL = invalidUrl;
+      await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /must use a valid HTTPS URL/);
+    }
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restore();
+  }
+});
