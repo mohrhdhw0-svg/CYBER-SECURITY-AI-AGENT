@@ -80,7 +80,7 @@ export default function CyberAssistant() {
               <div><strong>Cyber AI Assistant</strong><small><i /> مساعد الأمن السيبراني</small></div>
             </div>
             <div className="cyber-chat-actions">
-              <button type="button" title="مسح المحادثة" aria-label="مسح المحادثة" onClick={() => { setMessages([]); setError(""); }}><Trash2 size={16} /></button>
+              <button type="button" title="مسح المحادثة" aria-label="مسح المحادثة" disabled={busy} onClick={() => { setMessages([]); setError(""); }}><Trash2 size={16} /></button>
               <button type="button" title="إغلاق" aria-label="إغلاق المحادثة" onClick={() => setOpen(false)}><X size={19} /></button>
             </div>
           </header>
