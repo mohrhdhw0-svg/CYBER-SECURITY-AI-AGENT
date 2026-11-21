@@ -100,42 +100,56 @@ def redis_command(command):
         raise HTTPException(status_code=503, detail="Durable scan idempotency storage is unavailable.") from exc
 
 
-def cached_scan_result(request_id, target, authorization_reference):
+def scan_identity(target, authorization_reference, profile, top_ports):
+    identity = {"target": target, "authorization_reference": authorization_reference, "profile": profile, "top_ports": top_ports}
+    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def cached_scan_result(request_id, target, authorization_reference, profile, top_ports):
     raw = redis_command(["GET", "scan:engine:result:" + request_id])
     if raw is None:
         return None
     try:
-        result = json.loads(raw) if isinstance(raw, str) else raw
+        record = json.loads(raw) if isinstance(raw, str) else raw
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=503, detail="Stored scan result is invalid.") from exc
+    identity = scan_identity(target, authorization_reference, profile, top_ports)
+    if not isinstance(record, dict) or record.get("identity") != identity:
+        raise HTTPException(status_code=409, detail="Stored scan idempotency record does not match this scan request.")
+    result = record.get("result")
     if (not isinstance(result, dict) or result.get("status") != "completed"
             or result.get("target") != target
-            or result.get("authorization_reference") != authorization_reference):
-        raise HTTPException(status_code=409, detail="Stored scan idempotency record does not match this approval.")
+            or result.get("authorization_reference") != authorization_reference
+            or result.get("profile") != profile):
+        raise HTTPException(status_code=409, detail="Stored scan result does not match this approval.")
     return result
 
 
-def claim_scan_execution(request_id, target, authorization_reference):
-    result = cached_scan_result(request_id, target, authorization_reference)
+def claim_scan_execution(request_id, target, authorization_reference, profile, top_ports):
+    result = cached_scan_result(request_id, target, authorization_reference, profile, top_ports)
     if result is not None:
         return False, result
-    claimed = redis_command([
-        "SET", "scan:engine:state:" + request_id, "started",
-        "NX", "EX", str(IDEMPOTENCY_TTL_SECONDS),
-    ])
+    identity = scan_identity(target, authorization_reference, profile, top_ports)
+    state_key = "scan:engine:state:" + request_id
+    claimed = redis_command(["SET", state_key, identity, "NX", "EX", str(IDEMPOTENCY_TTL_SECONDS)])
     if claimed == "OK":
         return True, None
-    result = cached_scan_result(request_id, target, authorization_reference)
+    existing_identity = redis_command(["GET", state_key])
+    if existing_identity != identity:
+        raise HTTPException(status_code=409, detail="This approval request ID is already bound to a different scan configuration.")
+    result = cached_scan_result(request_id, target, authorization_reference, profile, top_ports)
     if result is not None:
         return False, result
     raise HTTPException(status_code=409, detail="A scan with this approval is already running or has an uncertain outcome; duplicate execution is blocked.")
 
 
-def persist_scan_result(request_id, result):
-    encoded = json.dumps(result, separators=(",", ":"), ensure_ascii=False)
+def persist_scan_result(request_id, target, authorization_reference, profile, top_ports, result):
+    identity = scan_identity(target, authorization_reference, profile, top_ports)
+    record = {"identity": identity, "result": result}
+    encoded = json.dumps(record, separators=(",", ":"), ensure_ascii=False)
     redis_command(["SET", "scan:engine:result:" + request_id, encoded, "EX", str(IDEMPOTENCY_TTL_SECONDS)])
-    redis_command(["SET", "scan:engine:state:" + request_id, "completed", "EX", str(IDEMPOTENCY_TTL_SECONDS)])
-
+    redis_command(["SET", "scan:engine:state:" + request_id, identity, "EX", str(IDEMPOTENCY_TTL_SECONDS)])
 
 def fetch_json(url, headers=None, timeout=8):
     req = urllib.request.Request(url, headers=headers or {"User-Agent":"CyberSecurityAI-Agent/0.3"})
@@ -213,13 +227,13 @@ def intel_scan(request: ScanRequest, authorization: Optional[str] = Header(defau
     if not request.confirm_authorized: raise HTTPException(status_code=400,detail="Explicit authorization confirmation is required.")
     target=check_target(request.target_ip,x_scan_approval,request.authorization_reference)
     request_id = request.authorization_reference.removeprefix("admin-approved:")
-    claimed, cached = claim_scan_execution(request_id, target, request.authorization_reference)
+    claimed, cached = claim_scan_execution(request_id, target, request.authorization_reference, "approved-public-ip-intelligence", request.top_ports)
     if not claimed:
         return cached
     passive=passive_intel(target)
     active=nmap_data(target,request.top_ports)
     result = {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"approved-public-ip-intelligence","passive":passive,"ports":active["ports"],"summary":active["summary"],"limitations":["Only the 100 most common TCP ports are checked by default.","No exploit attempts, credential attacks, vulnerability exploitation, or intrusive NSE scripts are run.","Reputation data requires an optional AbuseIPDB API key."]}
-    persist_scan_result(request_id, result)
+    persist_scan_result(request_id, target, request.authorization_reference, "approved-public-ip-intelligence", request.top_ports, result)
     return result
 
 
@@ -231,10 +245,10 @@ def nmap_scan(request: ScanRequest, authorization: Optional[str] = Header(defaul
         raise HTTPException(status_code=400, detail="Explicit authorization confirmation is required.")
     target = check_target(request.target_ip, x_scan_approval, request.authorization_reference)
     request_id = request.authorization_reference.removeprefix("admin-approved:")
-    claimed, cached = claim_scan_execution(request_id, target, request.authorization_reference)
+    claimed, cached = claim_scan_execution(request_id, target, request.authorization_reference, "nmap-safe-profile", request.top_ports)
     if not claimed:
         return cached
     data = nmap_data(target, request.top_ports)
     result = {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"nmap-safe-profile","ports":data["ports"],"summary":data["summary"]}
-    persist_scan_result(request_id, result)
+    persist_scan_result(request_id, target, request.authorization_reference, "nmap-safe-profile", request.top_ports, result)
     return result
