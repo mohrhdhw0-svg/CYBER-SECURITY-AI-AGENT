@@ -6,6 +6,8 @@ test("accepts ordinary public IPv4 addresses", () => {
   assert.equal(isPublicIPv4("8.8.8.8"), true);
   assert.equal(isPublicIPv4("1.1.1.1"), true);
   assert.equal(isPublicIPv4("203.0.114.1"), true);
+  assert.equal(isPublicIPv4("192.0.1.1"), true);
+  assert.equal(isPublicIPv4("192.2.1.1"), true);
 });
 
 test("rejects malformed and non-string input", () => {
