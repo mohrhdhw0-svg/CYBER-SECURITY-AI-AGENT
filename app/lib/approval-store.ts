@@ -3,7 +3,49 @@ import { cookies } from "next/headers";
 const redisUrl=()=>process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/,"");
 const redisToken=()=>process.env.UPSTASH_REDIS_REST_TOKEN;
 export type ScanRequest={id:string;ip:string;status:"pending"|"approved"|"rejected"|"scanning"|"completed"|"failed";createdAt:string;expiresAt?:string;decisionAt?:string;authorizationReference?:string;ticketProof?:string;result?:unknown;error?:string};
-async function redis(command:string[]){const url=redisUrl(),token=redisToken();if(!url||!token)throw new Error("Approval storage is not configured.");const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(command),cache:"no-store"});if(!r.ok)throw new Error("Approval storage request failed.");const data=await r.json();if(data.error)throw new Error("Approval storage error.");return data.result;}
+async function redis(command:string[]){
+ const rawUrl=redisUrl(),token=redisToken();
+ if(!rawUrl||!token)throw new Error("Approval storage is not configured.");
+ let endpoint:URL;
+ try{endpoint=new URL(rawUrl)}catch{throw new Error("Approval storage URL is invalid.");}
+ const localHost=["localhost","127.0.0.1","[::1]"].includes(endpoint.hostname);
+ const localHttp=process.env.NODE_ENV!=="production"&&endpoint.protocol==="http:"&&localHost;
+ if(endpoint.username||endpoint.password||endpoint.search||endpoint.hash||(endpoint.protocol!=="https:"&&!localHttp)){
+  throw new Error("Approval storage must use a valid HTTPS URL.");
+ }
+ const response=await fetch(endpoint,{
+  method:"POST",
+  headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+  body:JSON.stringify(command),
+  cache:"no-store",
+  redirect:"error",
+  signal:AbortSignal.timeout(4_000),
+ });
+ if(!response.ok){await response.body?.cancel().catch(()=>{});throw new Error("Approval storage request failed.");}
+ const declaredLength=Number(response.headers.get("content-length")||0);
+ if(Number.isFinite(declaredLength)&&declaredLength>16_384){
+  await response.body?.cancel().catch(()=>{});
+  throw new Error("Approval storage response is too large.");
+ }
+ if(!response.body)throw new Error("Approval storage returned an empty response.");
+ const reader=response.body.getReader();
+ const decoder=new TextDecoder("utf-8",{fatal:true});
+ let total=0,text="";
+ try{
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   total+=value.byteLength;
+   if(total>16_384){await reader.cancel();throw new Error("Approval storage response is too large.");}
+   text+=decoder.decode(value,{stream:true});
+  }
+  text+=decoder.decode();
+ }finally{reader.releaseLock();}
+ let data:any;
+ try{data=JSON.parse(text)}catch{throw new Error("Approval storage returned invalid JSON.");}
+ if(data?.error)throw new Error("Approval storage error.");
+ return data?.result;
+}
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
 export async function getRequest(id:string):Promise<ScanRequest|null>{const v=await redis(["GET",`scan:req:${id}`]);return v?JSON.parse(v):null;}
 export async function listRequests():Promise<ScanRequest[]>{const ids=await redis(["LRANGE","scan:req:index","0","499"]) as string[];const rows=await Promise.all([...new Set(ids)].map(getRequest));return rows.filter((x):x is ScanRequest=>!!x);}
@@ -17,7 +59,8 @@ export function newId(){return randomBytes(18).toString("hex");}
 
 export async function checkLoginRateLimit(clientKey:string){
  const key="admin:login:"+createHmac("sha256",process.env.ADMIN_SESSION_SECRET||"").update(clientKey).digest("hex");
- const count=Number(await redis(["EVAL","local count=redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return count","1",key,"900"]));
+ const count=await redis(["EVAL","local count=redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return count","1",key,"900"]);
+ if(!Number.isSafeInteger(count)||count<1)throw new Error("Login rate-limit counter is invalid.");
  return {allowed:count<=5,remaining:Math.max(0,5-count)};
 }
 export async function clearLoginRateLimit(clientKey:string){
