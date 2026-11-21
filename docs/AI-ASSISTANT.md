@@ -22,6 +22,7 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 - Provider redirects are rejected so the bearer credential is not sent through an unexpected redirect.
 - On Vercel, the rate limiter prefers `x-vercel-forwarded-for`, which Vercel documents as its edge-derived client IP header. For other hosting platforms, verify that the configured proxy overwrites forwarded-IP headers before trusting them.
 - Redis rate limiting fails closed if its configuration or service is unavailable.
+- The Redis REST URL must use HTTPS in production (local HTTP is allowed only for non-production localhost testing); embedded URL credentials, query strings, fragments, and redirects are rejected before the Redis bearer token is sent.
 
 ## Limits and behavior
 
@@ -42,4 +43,4 @@ Configure the variables in the Vercel project settings only after choosing a gat
 
 ## Automated tests
 
-Run `npm test` to execute the Node.js built-in test suite. It covers streamed request-size enforcement and UTF-8 decoding, plus provider request credential placement, redirect rejection, timeout handling, HTTP 429 handling, invalid/empty provider responses, the 1 MB response limit, and Redis rate-limit enforcement including fail-closed behavior. The branch validation workflow runs these tests before ESLint and the Next.js production build.
+Run `npm test` to execute the Node.js built-in test suite. It covers streamed request-size enforcement and UTF-8 decoding, plus provider request credential placement, redirect rejection, timeout handling, HTTP 429 handling, invalid/empty provider responses, the 1 MB response limit, and Redis rate-limit enforcement including fail-closed behavior and rejection of insecure or redirecting Redis endpoints. The branch validation workflow runs these tests before ESLint and the Next.js production build.
