@@ -194,9 +194,14 @@ def nmap_data(target, top_ports):
 def health(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
     idempotency_configured = bool(os.environ.get("UPSTASH_REDIS_REST_URL") and os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
-    ready=bool(TOKEN and NMAP_PATH and PERMIT_SECRET and NETWORKS and idempotency_configured)
-    return {"status":"ok" if ready else "degraded","engine":"nmap-plus-ip-intelligence","allowlist_configured":bool(NETWORKS),"dynamic_approval_configured":bool(PERMIT_SECRET),"nmap_available":bool(NMAP_PATH),"durable_idempotency_configured":idempotency_configured,"execution_enabled":ready}
-
+    idempotency_ready = False
+    if idempotency_configured:
+        try:
+            idempotency_ready = redis_command(["PING"]) == "PONG"
+        except HTTPException:
+            idempotency_ready = False
+    ready=bool(TOKEN and NMAP_PATH and PERMIT_SECRET and NETWORKS and idempotency_ready)
+    return {"status":"ok" if ready else "degraded","engine":"nmap-plus-ip-intelligence","allowlist_configured":bool(NETWORKS),"dynamic_approval_configured":bool(PERMIT_SECRET),"nmap_available":bool(NMAP_PATH),"durable_idempotency_configured":idempotency_ready,"execution_enabled":ready}
 @app.get("/tools")
 def tools(authorization: Optional[str] = Header(default=None)):
     require_auth(authorization)
