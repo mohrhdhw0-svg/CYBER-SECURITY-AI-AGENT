@@ -13,7 +13,7 @@ function validScanResult(result, expectedIp) {
   const validPorts = result.ports.every((port) =>
     isRecord(port) &&
     typeof port.port === "string" &&
-    /^\\d{1,5}$/.test(port.port) &&
+    /^\d{1,5}$/.test(port.port) &&
     Number(port.port) >= 1 &&
     Number(port.port) <= 65535 &&
     port.protocol === "tcp" &&
