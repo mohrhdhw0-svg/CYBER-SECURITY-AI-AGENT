@@ -48,7 +48,25 @@ async function redis(command:string[]){
  return data?.result;
 }
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
-export async function getRequest(id:string):Promise<ScanRequest|null>{const v=await redis(["GET",`scan:req:${id}`]);return v?JSON.parse(v):null;}
+const requestStatuses = new Set(["pending","approved","rejected","scanning","completed","failed"]);
+function parseStoredRequest(value: unknown, expectedId: string): ScanRequest | null {
+ if(typeof value!=="string")throw new Error("Stored approval request is not text.");
+ let parsed: unknown;
+ try{parsed=JSON.parse(value)}catch{throw new Error("Stored approval request contains invalid JSON.");}
+ if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("Stored approval request has an invalid shape.");
+ const item=parsed as Record<string,unknown>;
+ if(item.id!==expectedId||!/^([a-f0-9]{36})$/.test(expectedId)||typeof item.ip!=="string"||!isIPv4(item.ip)||!requestStatuses.has(String(item.status))||typeof item.createdAt!=="string"||!Number.isFinite(Date.parse(item.createdAt)))throw new Error("Stored approval request failed validation.");
+ if(item.expiresAt!==undefined&&(typeof item.expiresAt!=="string"||!Number.isFinite(Date.parse(item.expiresAt))))throw new Error("Stored approval expiry is invalid.");
+ if(item.ticketProof!==undefined&&(typeof item.ticketProof!=="string"||! /^[a-f0-9]{64}$/.test(item.ticketProof)))throw new Error("Stored approval ticket proof is invalid.");
+ if(item.authorizationReference!==undefined&&typeof item.authorizationReference!=="string")throw new Error("Stored authorization reference is invalid.");
+ if(item.error!==undefined&&typeof item.error!=="string")throw new Error("Stored approval error is invalid.");
+ return item as unknown as ScanRequest;
+}
+export async function getRequest(id:string):Promise<ScanRequest|null>{
+ if(!/^[a-f0-9]{36}$/.test(id))return null;
+ const value=await redis(["GET",`scan:req:${id}`]);
+ return value===null?null:parseStoredRequest(value,id);
+}
 export type AdminScanRequest = Pick<ScanRequest, "id" | "ip" | "status" | "createdAt" | "expiresAt">;
 export async function listRequests():Promise<AdminScanRequest[]>{
  const ids=await redis(["LRANGE","scan:req:index","0","199"]) as string[];
