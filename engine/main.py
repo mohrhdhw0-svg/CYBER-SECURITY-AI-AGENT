@@ -62,6 +62,7 @@ def check_target(value: str, permit: Optional[str], authorization_reference: str
 
 IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 MAX_IDEMPOTENCY_RESPONSE_BYTES = 1_048_576
+MAX_IDEMPOTENCY_RESULT_BYTES = 512_000
 
 
 class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -148,6 +149,8 @@ def persist_scan_result(request_id, target, authorization_reference, profile, to
     identity = scan_identity(target, authorization_reference, profile, top_ports)
     record = {"identity": identity, "result": result}
     encoded = json.dumps(record, separators=(",", ":"), ensure_ascii=False)
+    if len(encoded.encode("utf-8")) > MAX_IDEMPOTENCY_RESULT_BYTES:
+        raise HTTPException(status_code=502, detail="Scan result exceeded the durable storage limit.")
     redis_command(["SET", "scan:engine:result:" + request_id, encoded, "EX", str(IDEMPOTENCY_TTL_SECONDS)])
     redis_command(["SET", "scan:engine:state:" + request_id, identity, "EX", str(IDEMPOTENCY_TTL_SECONDS)])
 
