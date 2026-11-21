@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
 import { fetchAssistantCompletion } from "@/app/lib/assistant-provider.js";
+import { validateAssistantMessages } from "@/app/lib/assistant-messages.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,19 +96,9 @@ export async function POST(request: NextRequest) {
     return jsonError("أرسل من رسالة واحدة إلى 12 رسالة في المحادثة.", 400);
   }
 
-  const safeMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
-  for (const [index, item] of messages.entries()) {
-    if (!item || typeof item !== "object") return jsonError("تحتوي المحادثة على رسالة غير صالحة.", 400);
-    const role = (item as { role?: unknown }).role;
-    const content = (item as { content?: unknown }).content;
-    const expectedRole = index % 2 === 0 ? "user" : "assistant";
-    if (role !== expectedRole || typeof content !== "string" || !content.trim() || content.length > 6000) {
-      return jsonError("يجب أن تتناوب رسائل المستخدم والمساعد بالترتيب الصحيح، وبحد أقصى 6000 حرف للرسالة.", 400);
-    }
-    safeMessages.push({ role, content: content.trim() });
-  }
-  if (safeMessages[safeMessages.length - 1]?.role !== "user") {
-    return jsonError("يجب أن تنتهي المحادثة برسالة من المستخدم.", 400);
+  const safeMessages = validateAssistantMessages(messages);
+  if (!safeMessages) {
+    return jsonError("يجب أن تتناوب رسائل المستخدم والمساعد بالترتيب الصحيح، وتبدأ برسالة مستخدم وتنتهي بها، وبحد أقصى 6000 حرف للرسالة.", 400);
   }
 
   const result = await fetchAssistantCompletion({
