@@ -5,9 +5,9 @@ const allowedKeys = new Set(["id", "ip", "status", "createdAt", "expiresAt", "de
 const validDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
 
 const isRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-function validScanResult(result, expectedIp) {
+function validScanResult(result, expectedIp, expectedAuthorizationReference) {
   if (!isRecord(result) || result.status !== "completed" || result.target !== expectedIp) return false;
-  if (typeof result.authorization_reference !== "string" || result.authorization_reference.length < 4 || result.authorization_reference.length > 120) return false;
+  if (typeof result.authorization_reference !== "string" || result.authorization_reference.length < 4 || result.authorization_reference.length > 120 || result.authorization_reference !== expectedAuthorizationReference) return false;
   if (typeof result.profile !== "string" || result.profile.length > 120) return false;
   if (!Array.isArray(result.ports) || result.ports.length > 100) return false;
   const validPorts = result.ports.every((port) =>
@@ -80,7 +80,7 @@ export function parseStoredRequest(value, expectedId) {
   if (item.error !== undefined && (typeof item.error !== "string" || item.error.length > 1_000)) {
     throw new Error("Stored approval error is invalid.");
   }
-  if (item.result !== undefined && !validScanResult(item.result, item.ip)) {
+  if ((item.result !== undefined && item.status !== "completed") || (item.status === "completed" && item.result === undefined)) {\n    throw new Error("Stored request status and scan result are inconsistent.");\n  }\n  if (item.result !== undefined && !validScanResult(item.result, item.ip, item.authorizationReference)) {
     throw new Error("Stored scan result failed validation.");
   }
   return item;
