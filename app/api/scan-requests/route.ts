@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isIPv4 } from "node:net";
 import { randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { saveRequest, newId, getRequest } from "@/app/lib/approval-store";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
+import { isPublicIPv4 } from "@/app/lib/public-ipv4.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,29 +14,6 @@ function jsonError(message: string, status: number) {
   );
 }
 
-function publicIPv4(value: string) {
-  if (!isIPv4(value)) return false;
-  const [a, b, c] = value.split(".").map(Number);
-  // Deny special-purpose, private, loopback, link-local, documentation,
-  // benchmarking, multicast, and reserved ranges. This intentionally errs
-  // on the side of rejecting unusual addresses for a public scan workflow.
-  return !(
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    a >= 224 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 0) ||
-    (a === 192 && b === 2) ||
-    (a === 192 && b === 88 && c === 99) ||
-    (a === 192 && b === 168) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    (a === 198 && b === 51 && c === 100) ||
-    (a === 203 && b === 0 && c === 113)
-  );
-}
 
 export async function POST(req: NextRequest) {
   const origin = req.headers.get("origin");
@@ -64,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = (body as { ip: string }).ip.trim();
-  if (!publicIPv4(ip)) {
+  if (!isPublicIPv4(ip)) {
     return jsonError("أدخل عنوان IPv4 عاماً صالحاً؛ العناوين الخاصة والمحجوزة غير مسموحة.", 400);
   }
 
