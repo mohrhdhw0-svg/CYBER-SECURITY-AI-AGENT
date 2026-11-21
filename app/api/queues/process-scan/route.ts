@@ -8,6 +8,7 @@ import {
   createScanPermit,
 } from "@/app/lib/approval-store";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
+import { validScanResult } from "@/app/lib/stored-scan-request.js";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -78,7 +79,12 @@ export const POST = handleCallback(
       if (!current || current.status !== "scanning") return;
 
       const token = process.env.ENGINE_API_TOKEN;
-      if (!token || !current.expiresAt || !process.env.SCAN_APPROVAL_SECRET) {
+      if (
+        !token ||
+        !current.expiresAt ||
+        !process.env.SCAN_APPROVAL_SECRET ||
+        current.authorizationReference !== "admin-approved:" + current.id
+      ) {
         throw new Error("Scan engine configuration is incomplete.");
       }
 
@@ -143,6 +149,10 @@ export const POST = handleCallback(
             : `Scan engine rejected the request (HTTP ${response.status}).`;
         await updateRequest(current);
         return;
+      }
+
+      if (!validScanResult(data, current.ip, current.authorizationReference ?? "")) {
+        throw new Error("Scan engine returned a result that failed validation.");
       }
 
       current.status = "completed";
