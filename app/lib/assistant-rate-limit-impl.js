@@ -48,6 +48,7 @@ export async function checkAssistantRateLimit(clientKey) {
       "600",
     ]),
     cache: "no-store",
+    redirect: "error",
     signal: AbortSignal.timeout(4000),
   });
 
