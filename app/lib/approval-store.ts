@@ -48,7 +48,13 @@ async function redis(command:string[]){
 }
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
 export async function getRequest(id:string):Promise<ScanRequest|null>{const v=await redis(["GET",`scan:req:${id}`]);return v?JSON.parse(v):null;}
-export async function listRequests():Promise<ScanRequest[]>{const ids=await redis(["LRANGE","scan:req:index","0","499"]) as string[];const rows=await Promise.all([...new Set(ids)].map(getRequest));return rows.filter((x):x is ScanRequest=>!!x);}
+export type AdminScanRequest = Pick<ScanRequest, "id" | "ip" | "status" | "createdAt" | "expiresAt">;
+export async function listRequests():Promise<AdminScanRequest[]>{
+ const ids=await redis(["LRANGE","scan:req:index","0","199"]) as string[];
+ if(!Array.isArray(ids))throw new Error("Approval request index is invalid.");
+ const rows=await Promise.all([...new Set(ids)].filter((id):id is string=>typeof id==="string"&&/^[a-f0-9]{36}$/.test(id)).map(getRequest));
+ return rows.filter((x):x is ScanRequest=>!!x).map(({id,ip,status,createdAt,expiresAt})=>({id,ip,status,createdAt,expiresAt}));
+}
 export async function updateRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);}
 const sign=(value:string,secret:string)=>createHmac("sha256",secret).update(value).digest("base64url");
 export function validSecret(value:string,expected:string){const a=Buffer.from(value),b=Buffer.from(expected);return a.length===b.length&&timingSafeEqual(a,b);}
