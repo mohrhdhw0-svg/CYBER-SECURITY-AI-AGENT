@@ -172,13 +172,13 @@ class EngineGuardTests(unittest.TestCase):
             "ports": [],
         }
         with patch.object(main, "redis_command", side_effect=fake_redis):
-            claimed, cached = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+            claimed, cached = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
             self.assertTrue(claimed)
             self.assertIsNone(cached)
             with self.assertRaises(main.HTTPException) as ctx:
                 main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
             self.assertEqual(ctx.exception.status_code, 409)
-            main.persist_scan_result("a" * 36, result)
+            main.persist_scan_result("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100, result)
             claimed_again, replayed = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
             self.assertFalse(claimed_again)
             self.assertEqual(replayed, result)
@@ -229,8 +229,29 @@ class EngineGuardTests(unittest.TestCase):
              patch.object(main, "persist_scan_result") as persist:
             result = main.intel_scan(request, "Bearer test-token", "permit")
         scan.assert_called_once_with("8.8.8.8", 100)
-        persist.assert_called_once_with("a" * 36, result)
+        persist.assert_called_once_with("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100, result)
         self.assertEqual(result["status"], "completed")
+
+    def test_scan_identity_binds_profile_and_port_options(self):
+        base = main.scan_identity("8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
+        other_profile = main.scan_identity("8.8.8.8", AUTH_REF, "nmap-safe-profile", 100)
+        other_ports = main.scan_identity("8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 50)
+        self.assertNotEqual(base, other_profile)
+        self.assertNotEqual(base, other_ports)
+
+    def test_existing_claim_with_different_scan_identity_is_rejected(self):
+        store = {"scan:engine:state:" + "a" * 36: "different-identity"}
+        def fake_redis(command):
+            if command[0] == "GET": return store.get(command[1])
+            if command[0] == "SET":
+                if "NX" in command and command[1] in store: return None
+                store[command[1]] = command[2]
+                return "OK"
+            raise AssertionError("Unexpected Redis command")
+        with patch.object(main, "redis_command", side_effect=fake_redis):
+            with self.assertRaises(main.HTTPException) as ctx:
+                main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
+        self.assertEqual(ctx.exception.status_code, 409)
 
 if __name__ == "__main__":
     unittest.main()
