@@ -4,6 +4,41 @@ const requestStatuses = new Set(["pending", "approved", "rejected", "scanning", 
 const allowedKeys = new Set(["id", "ip", "status", "createdAt", "expiresAt", "decisionAt", "authorizationReference", "ticketProof", "result", "error"]);
 const validDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
 
+const isRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+function validScanResult(result, expectedIp) {
+  if (!isRecord(result) || result.status !== "completed" || result.target !== expectedIp) return false;
+  if (typeof result.authorization_reference !== "string" || result.authorization_reference.length < 4 || result.authorization_reference.length > 120) return false;
+  if (typeof result.profile !== "string" || result.profile.length > 120) return false;
+  if (!Array.isArray(result.ports) || result.ports.length > 100) return false;
+  const validPorts = result.ports.every((port) =>
+    isRecord(port) &&
+    typeof port.port === "string" &&
+    /^\\d{1,5}$/.test(port.port) &&
+    Number(port.port) >= 1 &&
+    Number(port.port) <= 65535 &&
+    port.protocol === "tcp" &&
+    typeof port.state === "string" &&
+    port.state.length <= 32 &&
+    typeof port.service === "string" &&
+    port.service.length <= 128 &&
+    (port.product === undefined || port.product === null || (typeof port.product === "string" && port.product.length <= 256)) &&
+    (port.version === undefined || port.version === null || (typeof port.version === "string" && port.version.length <= 256))
+  );
+  if (!validPorts || !isRecord(result.summary)) return false;
+  const { ports_observed: observed, open_ports: open } = result.summary;
+  if (!Number.isSafeInteger(observed) || observed !== result.ports.length || observed > 100) return false;
+  if (!Number.isSafeInteger(open) || open < 0 || open > observed) return false;
+  if (open !== result.ports.filter((port) => port.state === "open").length) return false;
+  if (!Array.isArray(result.limitations) || result.limitations.length > 20 ||
+      !result.limitations.every((entry) => typeof entry === "string" && entry.length <= 500)) return false;
+  if (result.passive !== undefined && !isRecord(result.passive)) return false;
+  try {
+    return Buffer.byteLength(JSON.stringify(result), "utf8") <= 1_000_000;
+  } catch {
+    return false;
+  }
+}
+
 export function parseStoredRequest(value, expectedId) {
   if (typeof value !== "string") throw new Error("Stored approval request is not text.");
   let parsed;
@@ -44,6 +79,9 @@ export function parseStoredRequest(value, expectedId) {
   }
   if (item.error !== undefined && (typeof item.error !== "string" || item.error.length > 1_000)) {
     throw new Error("Stored approval error is invalid.");
+  }
+  if (item.result !== undefined && !validScanResult(item.result, item.ip)) {
+    throw new Error("Stored scan result failed validation.");
   }
   return item;
 }
