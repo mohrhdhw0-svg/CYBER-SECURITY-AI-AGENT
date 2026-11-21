@@ -39,3 +39,7 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 ## Deployment
 
 Configure the variables in the Vercel project settings only after choosing a gateway that is reachable from Vercel and authorized for the intended audience. A local FreeLLMAPI address is not sufficient for Vercel. Then deploy the feature branch through a preview deployment. Do not merge into `main` until the preview and end-to-end provider test pass.
+
+## Automated tests
+
+Run `npm test` to execute the Node.js built-in test suite. It covers streamed request-size enforcement and UTF-8 decoding, plus provider request credential placement, redirect rejection, timeout handling, HTTP 429 handling, invalid/empty provider responses, and the 1 MB response limit. The branch validation workflow runs these tests before ESLint and the Next.js production build.
