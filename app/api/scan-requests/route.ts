@@ -16,19 +16,25 @@ function jsonError(message: string, status: number) {
 
 function publicIPv4(value: string) {
   if (!isIPv4(value)) return false;
-  const p = value.split(".").map(Number);
+  const [a, b, c] = value.split(".").map(Number);
+  // Deny special-purpose, private, loopback, link-local, documentation,
+  // benchmarking, multicast, and reserved ranges. This intentionally errs
+  // on the side of rejecting unusual addresses for a public scan workflow.
   return !(
-    p[0] === 10 ||
-    p[0] === 127 ||
-    p[0] === 0 ||
-    p[0] >= 224 ||
-    (p[0] === 169 && p[1] === 254) ||
-    (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
-    (p[0] === 192 && p[1] === 168) ||
-    (p[0] === 100 && p[1] >= 64 && p[1] <= 127) ||
-    (p[0] === 192 && p[1] === 0) ||
-    (p[0] === 198 && (p[1] === 18 || p[1] === 19)) ||
-    (p[0] === 203 && p[1] === 0 && p[2] === 113)
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 2) ||
+    (a === 192 && b === 88 && c === 99) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113)
   );
 }
 
