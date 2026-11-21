@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
 import { fetchAssistantCompletion } from "@/app/lib/assistant-provider.js";
-import { validateAssistantMessages } from "@/app/lib/assistant-messages.js";
+import { validateAssistantRequestBody } from "@/app/lib/assistant-messages.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,12 +91,7 @@ export async function POST(request: NextRequest) {
     if (rawBody === null) return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
     body = JSON.parse(rawBody);
   } catch { return jsonError("صيغة الطلب غير صالحة أو غير مشفرة بصيغة UTF-8 صحيحة.", 400); }
-  const messages = (body as { messages?: unknown })?.messages;
-  if (!Array.isArray(messages) || messages.length < 1 || messages.length > 12) {
-    return jsonError("أرسل من رسالة واحدة إلى 12 رسالة في المحادثة.", 400);
-  }
-
-  const safeMessages = validateAssistantMessages(messages);
+  const safeMessages = validateAssistantRequestBody(body);
   if (!safeMessages) {
     return jsonError("يجب أن تتناوب رسائل المستخدم والمساعد بالترتيب الصحيح، وتبدأ برسالة مستخدم وتنتهي بها، وبحد أقصى 6000 حرف للرسالة.", 400);
   }
