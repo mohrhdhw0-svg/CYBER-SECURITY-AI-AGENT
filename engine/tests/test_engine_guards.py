@@ -253,5 +253,20 @@ class EngineGuardTests(unittest.TestCase):
                 main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
         self.assertEqual(ctx.exception.status_code, 409)
 
+    def test_health_requires_redis_to_be_reachable_not_just_configured(self):
+        with patch.object(main, "NMAP_PATH", "/usr/bin/nmap"), patch.object(main, "NETWORKS", [main.ipaddress.ip_network("8.8.8.8/32")]), patch.object(main, "PERMIT_SECRET", "approval-secret"), patch.object(main, "redis_command", side_effect=main.HTTPException(status_code=503, detail="unavailable")):
+            result = main.health("Bearer test-token")
+        self.assertEqual(result["status"], "degraded")
+        self.assertFalse(result["durable_idempotency_configured"])
+        self.assertFalse(result["execution_enabled"])
+
+    def test_health_reports_ready_only_after_redis_ping(self):
+        with patch.object(main, "NMAP_PATH", "/usr/bin/nmap"), patch.object(main, "NETWORKS", [main.ipaddress.ip_network("8.8.8.8/32")]), patch.object(main, "PERMIT_SECRET", "approval-secret"), patch.object(main, "redis_command", return_value="PONG") as ping:
+            result = main.health("Bearer test-token")
+        ping.assert_called_once_with(["PING"])
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["durable_idempotency_configured"])
+        self.assertTrue(result["execution_enabled"])
+
 if __name__ == "__main__":
     unittest.main()
