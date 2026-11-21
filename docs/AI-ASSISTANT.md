@@ -20,7 +20,7 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 - Provider credentials are read only by the server route and are never returned by the status endpoint.
 - Production provider URLs must use HTTPS; local HTTP is allowed only during non-production development.
 - Provider redirects are rejected so the bearer credential is not sent through an unexpected redirect.
-- On Vercel, the rate limiter prefers `x-vercel-forwarded-for`, which Vercel documents as its edge-derived client IP header. For other hosting platforms, verify that the configured proxy overwrites forwarded-IP headers before trusting them.
+- The rate limiter trusts only Vercel's edge-generated `x-vercel-forwarded-for` header. If it is absent, requests share a conservative fallback bucket; client-supplied `x-forwarded-for` and `x-real-ip` values are not trusted.
 - Redis rate limiting fails closed if its configuration or service is unavailable.
 - The Redis REST URL must use HTTPS in production (local HTTP is allowed only for non-production localhost testing); embedded URL credentials, query strings, fragments, and redirects are rejected before the Redis bearer token is sent.
 
@@ -28,6 +28,7 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 
 - Maximum 12 conversation messages per request.
 - Maximum 6,000 characters per message.
+- Messages must alternate between `user` and `assistant`, begin with `user`, and end with `user`; the browser sends a bounded role-aligned context window.
 - Maximum 100 KB request body, enforced while reading the request stream (not only from the optional `Content-Length` header).
 - Maximum 1 MB upstream provider response, enforced while reading the response stream.
 - 15 requests per IP per 10-minute window, enforced through Redis.
