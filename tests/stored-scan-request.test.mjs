@@ -22,7 +22,16 @@ test("accepts supported lifecycle states and optional metadata", () => {
     expiresAt: "2026-11-22T00:00:00.000Z",
     decisionAt: "2026-11-21T01:00:00.000Z",
     authorizationReference: "admin-approved:" + id,
-    result: { findings: [] },
+    result: {
+  status: "completed",
+  target: "8.8.8.8",
+  authorization_reference: "admin-approved:" + id,
+  profile: "approved-public-ip-intelligence",
+  passive: { warnings: [] },
+  ports: [{ port: "443", protocol: "tcp", state: "open", service: "https", product: null, version: null }],
+  summary: { ports_observed: 1, open_ports: 1 },
+  limitations: ["Bounded test report"],
+}
   };
   assert.deepEqual(parseStoredRequest(JSON.stringify(item), id), item);
 });
@@ -59,4 +68,33 @@ test("rejects unexpected stored fields", () => {
 test("rejects invalid expected identifiers and non-text values", () => {
   assert.throws(() => parseStoredRequest(JSON.stringify(base), "invalid"));
   assert.throws(() => parseStoredRequest({ ...base }, id));
+});
+
+test("rejects malformed or target-mismatched scan results", () => {
+  const validResult = {
+  status: "completed",
+  target: "8.8.8.8",
+  authorization_reference: "admin-approved:" + id,
+  profile: "approved-public-ip-intelligence",
+  passive: { warnings: [] },
+  ports: [{ port: "443", protocol: "tcp", state: "open", service: "https", product: null, version: null }],
+  summary: { ports_observed: 1, open_ports: 1 },
+  limitations: ["Bounded test report"],
+};
+  const invalidResults = [
+    "completed",
+    { ...validResult, status: "running" },
+    { ...validResult, target: "1.1.1.1" },
+    { ...validResult, authorization_reference: "" },
+    { ...validResult, ports: Array(101).fill(validResult.ports[0]) },
+    { ...validResult, ports: [{ ...validResult.ports[0], port: "70000" }] },
+    { ...validResult, ports: [{ ...validResult.ports[0], protocol: "udp" }] },
+    { ...validResult, summary: { ports_observed: 2, open_ports: 1 } },
+    { ...validResult, summary: { ports_observed: 1, open_ports: 0 } },
+    { ...validResult, limitations: ["x".repeat(501)] },
+    { ...validResult, passive: [] },
+  ];
+  for (const result of invalidResults) {
+    assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "completed", result }), id));
+  }
 });
