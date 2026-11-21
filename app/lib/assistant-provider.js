@@ -33,11 +33,13 @@ export async function fetchAssistantCompletion({
     });
 
     if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
       return { ok: false, status: 502, reason: response.status === 429 ? "rate_limited" : "provider_error" };
     }
 
     const declaredLength = Number(response.headers.get("content-length") || 0);
     if (Number.isFinite(declaredLength) && declaredLength > 1_000_000) {
+      await response.body?.cancel().catch(() => {});
       return { ok: false, status: 502, reason: "response_too_large" };
     }
     if (!response.body) return { ok: false, status: 502, reason: "empty_response" };
