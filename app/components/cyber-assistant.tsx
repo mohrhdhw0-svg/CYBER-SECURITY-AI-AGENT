@@ -84,7 +84,7 @@ export default function CyberAssistant() {
           </header>
           <div className="cyber-chat-status">
             <span className={ready ? "cyber-status-dot ready" : "cyber-status-dot"} />
-            {ready === null ? "جارٍ التحقق من الاتصال..." : ready ? "إعدادات الذكاء الاصطناعي مكتملة" : "بانتظار إعداد محرك الذكاء الاصطناعي"}
+            {ready === null ? "جارٍ التحقق من الاتصال..." : ready ? "الإعدادات موجودة؛ الاتصال لم يُختبر بعد" : "بانتظار إعداد محرك الذكاء الاصطناعي"}
           </div>
           <div className="cyber-chat-messages" ref={scrollRef}>
             {messages.length === 0 ? (
