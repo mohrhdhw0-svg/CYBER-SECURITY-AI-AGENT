@@ -105,8 +105,8 @@ export async function GET(req: NextRequest) {
       .update(ticket + "." + id)
       .digest("hex");
     if (
-      !item.ticketProof ||
-      proof.length !== item.ticketProof.length ||
+      typeof item.ticketProof !== "string" ||
+      !/^[a-f0-9]{64}$/.test(item.ticketProof) ||
       !timingSafeEqual(Buffer.from(proof, "hex"), Buffer.from(item.ticketProof, "hex"))
     ) {
       return jsonError("تعذر التحقق من تذكرة الطلب.", 403);
