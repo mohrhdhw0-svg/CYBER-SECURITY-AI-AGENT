@@ -23,3 +23,14 @@ export function validateAssistantMessages(input) {
 
   return safeMessages[safeMessages.length - 1]?.role === "user" ? safeMessages : null;
 }
+
+/**
+ * Validate the outer JSON payload before reading its messages property.
+ * @param {unknown} input
+ * @returns {Array<{role: "user" | "assistant", content: string}> | null}
+ */
+export function validateAssistantRequestBody(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  if (Object.keys(input).some((key) => key !== "messages")) return null;
+  return validateAssistantMessages(input.messages);
+}
