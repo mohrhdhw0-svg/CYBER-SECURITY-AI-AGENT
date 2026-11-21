@@ -4,3 +4,4 @@ export type AssistantMessage = {
 };
 
 export function validateAssistantMessages(input: unknown): AssistantMessage[] | null;
+export function validateAssistantRequestBody(input: unknown): AssistantMessage[] | null;
