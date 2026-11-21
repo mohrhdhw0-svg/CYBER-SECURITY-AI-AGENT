@@ -1,13 +1,16 @@
 /**
- * Read a request body without buffering more than the configured byte limit.
- * Returns null when the limit is exceeded.
- * @param {Request} request
+ * Read a Fetch API request or response body without buffering more than the
+ * configured byte limit. Returns null when the limit is exceeded.
+ * @param {{ body: ReadableStream<Uint8Array> | null }} source
  * @param {number} maxBytes
  * @returns {Promise<string | null>}
  */
-export async function readBodyWithLimit(request, maxBytes) {
-  if (!request.body) return "";
-  const reader = request.body.getReader();
+export async function readBodyWithLimit(source, maxBytes) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {
+    throw new TypeError("maxBytes must be a non-negative safe integer.");
+  }
+  if (!source.body) return "";
+  const reader = source.body.getReader();
   const chunks = [];
   let totalBytes = 0;
   try {
