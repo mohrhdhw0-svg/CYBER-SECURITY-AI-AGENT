@@ -269,5 +269,13 @@ class EngineGuardTests(unittest.TestCase):
         self.assertTrue(result["durable_idempotency_configured"])
         self.assertTrue(result["execution_enabled"])
 
+    def test_oversized_result_is_not_persisted_to_redis(self):
+        result = {"status": "completed", "target": "8.8.8.8", "authorization_reference": AUTH_REF, "profile": "approved-public-ip-intelligence", "data": "x" * 520_000}
+        with patch.object(main, "redis_command") as redis_call:
+            with self.assertRaises(main.HTTPException) as ctx:
+                main.persist_scan_result("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100, result)
+        self.assertEqual(ctx.exception.status_code, 502)
+        redis_call.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
