@@ -95,7 +95,7 @@ class EngineGuardTests(unittest.TestCase):
     def test_scan_is_blocked_when_nmap_binary_is_missing(self):
         request = main.ScanRequest(
             target_ip="8.8.8.8",
-            authorization_reference="admin-approved:test-request-id",
+            authorization_reference="admin-approved:" + "a" * 36,
             confirm_authorized=True,
         )
         with patch.object(main, "NMAP_PATH", None):
