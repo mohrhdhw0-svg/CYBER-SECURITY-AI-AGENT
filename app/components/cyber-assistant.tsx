@@ -50,6 +50,8 @@ export default function CyberAssistant() {
       if (!response.ok) throw new Error(data.error || "تعذر إرسال الرسالة.");
       setMessages((current) => [...current, { role: "assistant", content: data.answer, id: crypto.randomUUID() }]);
     } catch (err) {
+      // Remove the failed user turn so it is not silently resent next time.
+      setMessages((current) => current.filter((message) => message.id !== next[next.length - 1].id));
       setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع.");
     } finally {
       setBusy(false);
@@ -86,7 +88,7 @@ export default function CyberAssistant() {
             <span className={ready ? "cyber-status-dot ready" : "cyber-status-dot"} />
             {ready === null ? "جارٍ التحقق من الاتصال..." : ready ? "الإعدادات موجودة؛ الاتصال لم يُختبر بعد" : "بانتظار إعداد محرك الذكاء الاصطناعي"}
           </div>
-          <div className="cyber-chat-messages" ref={scrollRef}>
+          <div className="cyber-chat-messages" ref={scrollRef} aria-live="polite" aria-relevant="additions text">
             {messages.length === 0 ? (
               <div className="cyber-chat-welcome">
                 <div className="cyber-welcome-icon"><Sparkles size={22} /></div>
