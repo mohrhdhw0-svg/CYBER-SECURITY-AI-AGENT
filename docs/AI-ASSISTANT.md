@@ -42,4 +42,4 @@ Configure the variables in the Vercel project settings only after choosing a gat
 
 ## Automated tests
 
-Run `npm test` to execute the Node.js built-in test suite. It covers streamed request-size enforcement and UTF-8 decoding, plus provider request credential placement, redirect rejection, timeout handling, HTTP 429 handling, invalid/empty provider responses, and the 1 MB response limit. The branch validation workflow runs these tests before ESLint and the Next.js production build.
+Run `npm test` to execute the Node.js built-in test suite. It covers streamed request-size enforcement and UTF-8 decoding, plus provider request credential placement, redirect rejection, timeout handling, HTTP 429 handling, invalid/empty provider responses, the 1 MB response limit, and Redis rate-limit enforcement including fail-closed behavior. The branch validation workflow runs these tests before ESLint and the Next.js production build.
