@@ -133,3 +133,19 @@ test("rejects Redis URLs containing embedded credentials or query parameters", a
     restore();
   }
 });
+
+test("cancels Redis HTTP error response bodies before failing closed", async () => {
+  const restore = setTestEnvironment();
+  const originalFetch = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    cancel() { cancelled = true; },
+  }), { status: 503 });
+  try {
+    await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /request failed/);
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restore();
+  }
+});
