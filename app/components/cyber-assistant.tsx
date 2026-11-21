@@ -18,6 +18,7 @@ export default function CyberAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +35,8 @@ export default function CyberAssistant() {
 
   async function sendMessage(text = input) {
     const content = text.trim();
-    if (!content || busy) return;
+    if (!content || busyRef.current) return;
+    busyRef.current = true;
     const next: Message[] = [...messages, { role: "user", content, id: crypto.randomUUID() }];
     setMessages(next);
     setInput("");
@@ -54,6 +56,7 @@ export default function CyberAssistant() {
       setMessages((current) => current.filter((message) => message.id !== next[next.length - 1].id));
       setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
