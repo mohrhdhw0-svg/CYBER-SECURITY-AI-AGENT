@@ -64,13 +64,11 @@ export async function POST(request: NextRequest) {
     return jsonError("قيمة AI_API_BASE_URL غير صالحة.", 503);
   }
 
-  // Vercel overwrites its forwarded client-IP header at the edge to prevent spoofing.
-  const clientKey = (
-    request.headers.get("x-vercel-forwarded-for") ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("x-forwarded-for") ||
-    "unknown"
-  ).split(",")[0].trim().slice(0, 100);
+  // Trust only Vercel's edge-generated client-IP header. Generic forwarding
+  // headers can be supplied by clients on other platforms and enable quota evasion.
+  // If the trusted header is absent, use one shared bucket rather than trust spoofable input.
+  const clientKey = (request.headers.get("x-vercel-forwarded-for") || "unknown")
+    .split(",")[0].trim().slice(0, 100) || "unknown";
 
   try {
     const limit = await checkAssistantRateLimit(clientKey);
@@ -98,12 +96,13 @@ export async function POST(request: NextRequest) {
   }
 
   const safeMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
-  for (const item of messages) {
+  for (const [index, item] of messages.entries()) {
     if (!item || typeof item !== "object") return jsonError("تحتوي المحادثة على رسالة غير صالحة.", 400);
     const role = (item as { role?: unknown }).role;
     const content = (item as { content?: unknown }).content;
-    if ((role !== "user" && role !== "assistant") || typeof content !== "string" || !content.trim() || content.length > 6000) {
-      return jsonError("تحقق من أدوار الرسائل وطول النص؛ الحد الأقصى 6000 حرف للرسالة.", 400);
+    const expectedRole = index % 2 === 0 ? "user" : "assistant";
+    if (role !== expectedRole || typeof content !== "string" || !content.trim() || content.length > 6000) {
+      return jsonError("يجب أن تتناوب رسائل المستخدم والمساعد بالترتيب الصحيح، وبحد أقصى 6000 حرف للرسالة.", 400);
     }
     safeMessages.push({ role, content: content.trim() });
   }
