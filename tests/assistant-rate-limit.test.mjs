@@ -149,3 +149,51 @@ test("cancels Redis HTTP error response bodies before failing closed", async () 
     restore();
   }
 });
+
+test("fails closed and cancels oversized Redis responses declared by Content-Length", async () => {
+  const restore = setTestEnvironment();
+  const originalFetch = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    cancel() { cancelled = true; },
+  }), { status: 200, headers: { "content-length": "16385" } });
+  try {
+    await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /response is too large/);
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restore();
+  }
+});
+
+test("enforces the Redis response byte limit while streaming", async () => {
+  const restore = setTestEnvironment();
+  const originalFetch = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(10_000));
+      controller.enqueue(new Uint8Array(7_000));
+    },
+    cancel() { cancelled = true; },
+  }));
+  try {
+    await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /response is too large/);
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restore();
+  }
+});
+
+test("fails closed when Redis returns malformed JSON", async () => {
+  const restore = setTestEnvironment();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("{not-json");
+  try {
+    await assert.rejects(checkAssistantRateLimit("203.0.113.10"), /invalid JSON/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restore();
+  }
+});
