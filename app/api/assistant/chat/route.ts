@@ -29,7 +29,7 @@ export async function GET() {
   return NextResponse.json({
     configured,
     provider: configured ? "openai-compatible" : null,
-    message: configured ? "مساعد الذكاء الاصطناعي جاهز لاستقبال الأسئلة." : "يلزم إعداد AI_API_BASE_URL وAI_API_KEY وAI_MODEL، مع إعداد Redis وحماية الجلسات."
+    message: configured ? "اكتملت إعدادات مزود الذكاء الاصطناعي والحماية." : "يلزم إعداد AI_API_BASE_URL وAI_API_KEY وAI_MODEL، مع إعداد Redis وحماية الجلسات."
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     return jsonError("قيمة AI_API_BASE_URL غير صالحة.", 503);
   }
 
-  const clientKey = (request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown").split(",")[0].trim().slice(0, 100);
+  const clientKey = (request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim().slice(0, 100);
   try {
     const limit = await checkAssistantRateLimit(clientKey);
     if (!limit.allowed) return jsonError("تم بلوغ حد المحادثات المؤقت. حاول مجدداً بعد 10 دقائق.", 429);
