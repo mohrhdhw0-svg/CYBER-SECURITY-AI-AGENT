@@ -129,7 +129,40 @@ export async function POST(request: NextRequest) {
         : "تعذر الحصول على إجابة من مزود الذكاء الاصطناعي. تحقق من إعدادات البوابة والموديل.", 502);
     }
 
-    const data = await response.json();
+    // Bound provider response memory use; an upstream gateway must not be able
+    // to make this serverless function buffer an unbounded response.
+    const declaredResponseLength = Number(response.headers.get("content-length") || 0);
+    if (declaredResponseLength > 1_000_000) {
+      return jsonError("استجابة مزود الذكاء الاصطناعي أكبر من الحد المسموح.", 502);
+    }
+    if (!response.body) return jsonError("أعاد مزود الذكاء الاصطناعي استجابة فارغة.", 502);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let responseBytes = 0;
+    let responseText = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        responseBytes += value.byteLength;
+        if (responseBytes > 1_000_000) {
+          await reader.cancel();
+          return jsonError("استجابة مزود الذكاء الاصطناعي أكبر من الحد المسموح.", 502);
+        }
+        responseText += decoder.decode(value, { stream: true });
+      }
+      responseText += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
+
+    let data: { choices?: Array<{ message?: { content?: unknown } }> };
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return jsonError("أعاد مزود الذكاء الاصطناعي استجابة غير صالحة.", 502);
+    }
     const raw = data?.choices?.[0]?.message?.content;
     const answer = typeof raw === "string"
       ? raw.trim()
