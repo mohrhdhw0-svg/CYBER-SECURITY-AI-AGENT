@@ -19,6 +19,26 @@ function jsonError(message: string, status: number) {
   );
 }
 
+function adminRequestSummary(item: {
+  id: string;
+  ip: string;
+  status: string;
+  createdAt: string;
+  expiresAt?: string;
+  decisionAt?: string;
+  error?: string;
+}) {
+  return {
+    id: item.id,
+    ip: item.ip,
+    status: item.status,
+    createdAt: item.createdAt,
+    expiresAt: item.expiresAt,
+    decisionAt: item.decisionAt,
+    error: item.error,
+  };
+}
+
 export async function GET() {
   if (!(await isAdmin())) return jsonError("غير مصرح.", 401);
   try {
@@ -76,7 +96,7 @@ export async function POST(req: NextRequest) {
         return jsonError("تم اتخاذ قرار لهذا الطلب مسبقاً.", 409);
       }
       return NextResponse.json(
-        { request: item },
+        { request: adminRequestSummary(item) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -112,13 +132,13 @@ export async function POST(req: NextRequest) {
       item.error = "تعذر وضع الفحص في قائمة المهام؛ تحقق من تفعيل Vercel Queues وصلاحيات OIDC.";
       await updateRequest(item);
       return NextResponse.json(
-        { request: item, error: item.error },
+        { request: adminRequestSummary(item), error: item.error },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     return NextResponse.json(
-      { request: item, queued: true },
+      { request: adminRequestSummary(item), queued: true },
       { status: 202, headers: { "Cache-Control": "no-store" } },
     );
   } catch {
