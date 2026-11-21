@@ -46,13 +46,15 @@ function getEngineEndpoint() {
 }
 
 export const POST = handleCallback(
-  async (message: ScanMessage) => {
+  async (message: ScanMessage, metadata) => {
     if (
       !message ||
       typeof message.requestId !== "string" ||
       !/^[a-f0-9]{36}$/.test(message.requestId)
     ) {
-      throw new Error("Invalid scan queue message.");
+      // Malformed queue payloads are poison messages; acknowledge without
+      // touching any stored request.
+      return;
     }
 
     const item = await getRequest(message.requestId);
@@ -146,15 +148,27 @@ export const POST = handleCallback(
       current.result = data;
       delete current.error;
       await updateRequest(current);
+    } catch (error) {
+      // After repeated delivery failures, persist a terminal state rather than
+      // acknowledging the message while leaving the UI stuck on "scanning".
+      if (metadata.deliveryCount >= 8) {
+        const latest = await getRequest(item.id);
+        if (latest?.status === "scanning") {
+          latest.status = "failed";
+          latest.error = "تعذر إكمال الفحص بعد عدة محاولات. راجع اتصال المحرك وإعداداته ثم أعد إرسال الطلب.";
+          await updateRequest(latest);
+          return;
+        }
+      }
+      throw error;
     } finally {
       await releaseScanLease(item.id, leaseToken);
     }
   },
   {
     visibilityTimeoutSeconds: 180,
-    retry: (_error, metadata) =>
-      metadata.deliveryCount > 8
-        ? { acknowledge: true }
-        : { afterSeconds: Math.min(300, metadata.deliveryCount * 15) },
+    retry: (_error, metadata) => ({
+      afterSeconds: Math.min(300, Math.max(15, metadata.deliveryCount * 15)),
+    }),
   },
 );
