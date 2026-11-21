@@ -1,1 +1,1 @@
-export { checkAssistantRateLimit } from "./assistant-rate-limit.js";
+export { checkAssistantRateLimit } from "./assistant-rate-limit-impl.js";
