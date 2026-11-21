@@ -196,5 +196,41 @@ class EngineGuardTests(unittest.TestCase):
         self.assertFalse(result["durable_idempotency_configured"])
         self.assertFalse(result["execution_enabled"])
 
+
+    def test_intel_endpoint_replays_cached_result_without_running_scanner(self):
+        request = main.ScanRequest(
+            target_ip="8.8.8.8",
+            authorization_reference=AUTH_REF,
+            confirm_authorized=True,
+        )
+        cached = {
+            "status": "completed",
+            "target": "8.8.8.8",
+            "authorization_reference": AUTH_REF,
+            "profile": "approved-public-ip-intelligence",
+        }
+        with patch.object(main, "check_target", return_value="8.8.8.8"), \
+             patch.object(main, "claim_scan_execution", return_value=(False, cached)), \
+             patch.object(main, "passive_intel", side_effect=AssertionError("duplicate passive work")), \
+             patch.object(main, "nmap_data", side_effect=AssertionError("duplicate Nmap execution")):
+            result = main.intel_scan(request, "Bearer test-token", "permit")
+        self.assertEqual(result, cached)
+
+    def test_intel_endpoint_persists_result_after_single_scan(self):
+        request = main.ScanRequest(
+            target_ip="8.8.8.8",
+            authorization_reference=AUTH_REF,
+            confirm_authorized=True,
+        )
+        with patch.object(main, "check_target", return_value="8.8.8.8"), \
+             patch.object(main, "claim_scan_execution", return_value=(True, None)), \
+             patch.object(main, "passive_intel", return_value={"rdap": None}), \
+             patch.object(main, "nmap_data", return_value={"ports": [], "summary": {"ports_observed": 0, "open_ports": 0}}) as scan, \
+             patch.object(main, "persist_scan_result") as persist:
+            result = main.intel_scan(request, "Bearer test-token", "permit")
+        scan.assert_called_once_with("8.8.8.8", 100)
+        persist.assert_called_once_with("a" * 36, result)
+        self.assertEqual(result["status"], "completed")
+
 if __name__ == "__main__":
     unittest.main()
