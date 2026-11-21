@@ -128,3 +128,21 @@ test("rejects invalid JSON and empty provider answers", async (t) => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("enforces the provider response byte limit while streaming without Content-Length", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(600_000));
+      controller.enqueue(new Uint8Array(500_000));
+      controller.close();
+    },
+  }));
+  try {
+    assert.deepEqual(await fetchAssistantCompletion(options), {
+      ok: false, status: 502, reason: "response_too_large",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
