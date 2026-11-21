@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit";
+import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,35 +16,6 @@ const SYSTEM_PROMPT = `أنت Cyber AI Assistant، المساعد التعليم
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
-}
-
-async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promise<string | null> {
-  if (!request.body) return "";
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > maxBytes) {
-        await reader.cancel();
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder("utf-8", { fatal: true }).decode(body);
 }
 
 export async function GET() {
