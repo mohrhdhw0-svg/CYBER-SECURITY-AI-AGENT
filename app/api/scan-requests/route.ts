@@ -87,8 +87,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const raw = req.cookies.get("scan_ticket")?.value || "";
-  const [ticket, id] = raw.split(".");
-  if (!ticket || !id) return jsonError("لا يوجد طلب مرتبط بهذا المتصفح.", 404);
+  const parts = raw.split(".");
+  if (parts.length !== 2) return jsonError("لا يوجد طلب مرتبط بهذا المتصفح.", 404);
+  const [ticket, id] = parts;
+  if (!/^[a-f0-9]{64}$/.test(ticket) || !/^[a-f0-9]{36}$/.test(id)) {
+    return jsonError("تذكرة الطلب غير صالحة.", 404);
+  }
 
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) return jsonError("النظام غير مهيأ.", 503);
