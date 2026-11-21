@@ -94,7 +94,8 @@ export default function Home() {
     (t.name + " " + t.description + " " + t.category).toLowerCase().includes(query.toLowerCase())
   ),[query,category]);
 
-  return <main className="shell">
+  return <>
+    <main className="shell">
     <aside className={mobileOpen ? "sidebar open" : "sidebar"}>
       <div className="brand"><div className="brand-mark"><ShieldCheck size={24}/></div><div><b>CYBER<span>AI</span></b><small>SECURITY OPERATIONS</small></div><button className="close-menu" onClick={()=>setMobileOpen(false)}><X/></button></div>
       <div className="workspace"><span className="live-dot"/> مساحة العمل الرئيسية <ChevronLeft size={15}/></div>
@@ -125,7 +126,8 @@ export default function Home() {
       </div>
     </section>
   </main>
-    <CyberAssistant />;
+    <CyberAssistant />
+  </>;
 }
 
 function Stat({icon:Icon,label,value,detail,tone}:{icon:typeof Boxes;label:string;value:string;detail:string;tone:string}) {
