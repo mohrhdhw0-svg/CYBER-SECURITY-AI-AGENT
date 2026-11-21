@@ -21,9 +21,9 @@ Never commit real credentials. Configure the engine variables in the Docker host
 ## Authorization and scan limits
 
 - The engine requires a valid bearer token.
-- Every scan requires a short-lived HMAC permit bound to the exact public IP and approval expiry.
+- Every scan requires a short-lived HMAC permit bound to the exact public IP, a valid request ID, the approval reference, and the approval expiry.
 - Private, loopback, link-local, multicast, reserved, and otherwise non-global IP addresses are rejected.
-- If `AUTHORIZED_CIDRS` is configured, the target must also fall inside one of those additional ranges.
+- The `AUTHORIZED_CIDRS` allowlist is mandatory; the target must fall inside one of its explicitly authorized public ranges.
 - Nmap is limited to the top 10–100 common TCP ports, conservative timing, service detection, and a bounded timeout.
 - No exploit attempts, credential attacks, arbitrary shell commands, or intrusive NSE scripts are run.
 
