@@ -5,7 +5,7 @@ const allowedKeys = new Set(["id", "ip", "status", "createdAt", "expiresAt", "de
 const validDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
 
 const isRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-function validScanResult(result, expectedIp, expectedAuthorizationReference) {
+export function validScanResult(result, expectedIp, expectedAuthorizationReference) {
   if (!isRecord(result) || result.status !== "completed" || result.target !== expectedIp) return false;
   if (typeof result.authorization_reference !== "string" || result.authorization_reference.length < 4 || result.authorization_reference.length > 120 || result.authorization_reference !== expectedAuthorizationReference) return false;
   if (typeof result.profile !== "string" || result.profile.length > 120) return false;
