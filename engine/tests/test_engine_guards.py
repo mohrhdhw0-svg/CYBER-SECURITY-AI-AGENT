@@ -14,6 +14,9 @@ os.environ["SCAN_APPROVAL_SECRET"] = "test-approval-secret-at-least-32-bytes"
 import main
 
 
+AUTH_REF = "admin-approved:" + "a" * 36
+
+
 def signed_permit(ip, exp=None):
     payload = {
         "ip": ip,
@@ -33,19 +36,19 @@ def signed_permit(ip, exp=None):
 class EngineGuardTests(unittest.TestCase):
     def test_allowlisted_ip_still_requires_admin_approval(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("8.8.8.8")
+            main.check_target("8.8.8.8", None, AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 403)
-        self.assertEqual(main.check_target("8.8.8.8", signed_permit("8.8.8.8")), "8.8.8.8")
+        self.assertEqual(main.check_target("8.8.8.8", signed_permit("8.8.8.8"), AUTH_REF), "8.8.8.8")
 
     def test_ip_outside_authorized_cidr_restriction_is_rejected_even_with_approval(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("8.8.4.4", signed_permit("8.8.4.4"))
+            main.check_target("8.8.4.4", signed_permit("8.8.4.4"), AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 403)
 
     def test_empty_allowlist_blocks_scanning_even_with_admin_permit(self):
         with patch.object(main, "NETWORKS", []):
             with self.assertRaises(main.HTTPException) as ctx:
-                main.check_target("8.8.8.8", signed_permit("8.8.8.8"))
+                main.check_target("8.8.8.8", signed_permit("8.8.8.8"), AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 503)
 
     def test_health_is_degraded_when_authorized_cidr_allowlist_is_missing(self):
@@ -68,12 +71,12 @@ class EngineGuardTests(unittest.TestCase):
 
     def test_hostname_is_rejected(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("example.com", signed_permit("example.com"))
+            main.check_target("example.com", signed_permit("example.com"), AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 400)
 
     def test_loopback_is_rejected(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("127.0.0.1", signed_permit("127.0.0.1"))
+            main.check_target("127.0.0.1", signed_permit("127.0.0.1"), AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 400)
 
     def test_missing_or_invalid_bearer_is_rejected(self):
@@ -129,7 +132,7 @@ class EngineGuardTests(unittest.TestCase):
         encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
         signature = hmac.new(os.environ["SCAN_APPROVAL_SECRET"].encode(), encoded.encode(), hashlib.sha256).digest()
         permit = encoded + "." + base64.urlsafe_b64encode(signature).decode().rstrip("=")
-        self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8"))
+        self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", AUTH_REF))
 
     def test_permit_expiry_must_be_integer_not_boolean_or_float(self):
         for expiry in (True, time.time() * 1000 + 300_000):
@@ -141,7 +144,7 @@ class EngineGuardTests(unittest.TestCase):
 
     def test_permit_is_bound_to_admin_approval_reference(self):
         permit = signed_permit("8.8.8.8")
-        self.assertTrue(main.valid_dynamic_permit(permit, "8.8.8.8", "admin-approved:" + "a" * 36))
+        self.assertTrue(main.valid_dynamic_permit(permit, "8.8.8.8", AUTH_REF))
         self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "admin-approved:" + "b" * 36))
         self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "unrelated-reference"))
 
