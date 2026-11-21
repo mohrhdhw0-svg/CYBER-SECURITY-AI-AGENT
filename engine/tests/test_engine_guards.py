@@ -60,13 +60,13 @@ class EngineGuardTests(unittest.TestCase):
 
     def test_permit_bound_to_exact_ip(self):
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("8.8.8.8", signed_permit("1.1.1.1"))
+            main.check_target("8.8.8.8", signed_permit("1.1.1.1"), AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 403)
 
     def test_expired_admin_permit_is_rejected(self):
         expired = signed_permit("8.8.8.8", int((time.time() - 60) * 1000))
         with self.assertRaises(main.HTTPException) as ctx:
-            main.check_target("8.8.8.8", expired)
+            main.check_target("8.8.8.8", expired, AUTH_REF)
         self.assertEqual(ctx.exception.status_code, 403)
 
     def test_hostname_is_rejected(self):
@@ -140,7 +140,7 @@ class EngineGuardTests(unittest.TestCase):
             encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
             signature = hmac.new(os.environ["SCAN_APPROVAL_SECRET"].encode(), encoded.encode(), hashlib.sha256).digest()
             permit = encoded + "." + base64.urlsafe_b64encode(signature).decode().rstrip("=")
-            self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8"))
+            self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", AUTH_REF))
 
     def test_permit_is_bound_to_admin_approval_reference(self):
         permit = signed_permit("8.8.8.8")
