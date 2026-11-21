@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAssistantRateLimit } from "@/app/lib/assistant-rate-limit";
 import { readBodyWithLimit } from "@/app/lib/read-body-with-limit.js";
+import { fetchAssistantCompletion } from "@/app/lib/assistant-provider.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,72 +111,30 @@ export async function POST(request: NextRequest) {
     return jsonError("يجب أن تنتهي المحادثة برسالة من المستخدم.", 400);
   }
 
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...safeMessages],
-        temperature: 0.25,
-        max_tokens: 1200,
-        stream: false
-      }),
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(45000)
-    });
+  const result = await fetchAssistantCompletion({
+    endpoint,
+    apiKey,
+    model,
+    messages: safeMessages,
+    systemPrompt: SYSTEM_PROMPT,
+  });
 
-    if (!response.ok) {
-      return jsonError(response.status === 429
-        ? "مزود الذكاء الاصطناعي مشغول حالياً. انتظر قليلاً ثم أعد المحاولة."
-        : "تعذر الحصول على إجابة من مزود الذكاء الاصطناعي. تحقق من إعدادات البوابة والموديل.", 502);
+  if (!result.ok) {
+    if (result.reason === "rate_limited") {
+      return jsonError("مزود الذكاء الاصطناعي مشغول حالياً. انتظر قليلاً ثم أعد المحاولة.", 502);
     }
-
-    // Bound provider response memory use; an upstream gateway must not be able
-    // to make this serverless function buffer an unbounded response.
-    const declaredResponseLength = Number(response.headers.get("content-length") || 0);
-    if (declaredResponseLength > 1_000_000) {
+    if (result.reason === "response_too_large") {
       return jsonError("استجابة مزود الذكاء الاصطناعي أكبر من الحد المسموح.", 502);
     }
-    if (!response.body) return jsonError("أعاد مزود الذكاء الاصطناعي استجابة فارغة.", 502);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let responseBytes = 0;
-    let responseText = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        responseBytes += value.byteLength;
-        if (responseBytes > 1_000_000) {
-          await reader.cancel();
-          return jsonError("استجابة مزود الذكاء الاصطناعي أكبر من الحد المسموح.", 502);
-        }
-        responseText += decoder.decode(value, { stream: true });
-      }
-      responseText += decoder.decode();
-    } finally {
-      reader.releaseLock();
+    if (result.reason === "empty_response" || result.reason === "empty_answer") {
+      return jsonError("أعاد مزود الذكاء الاصطناعي استجابة فارغة أو بصيغة غير مدعومة.", 502);
     }
-
-    let data: { choices?: Array<{ message?: { content?: unknown } }> };
-    try {
-      data = JSON.parse(responseText);
-    } catch {
+    if (result.reason === "invalid_provider_json") {
       return jsonError("أعاد مزود الذكاء الاصطناعي استجابة غير صالحة.", 502);
     }
-    const raw = data?.choices?.[0]?.message?.content;
-    const answer = typeof raw === "string"
-      ? raw.trim()
-      : Array.isArray(raw)
-        ? raw.map((part: { type?: string; text?: string }) => part?.type === "text" ? part.text || "" : "").join("\n").trim()
-        : "";
-
-    if (!answer) return jsonError("أعاد مزود الذكاء الاصطناعي استجابة فارغة أو بصيغة غير مدعومة.", 502);
-    return NextResponse.json({ answer }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return jsonError("انتهت مهلة الاتصال أو تعذر الوصول إلى مزود الذكاء الاصطناعي.", 504);
+    return jsonError("انتهت مهلة الاتصال أو تعذر الوصول إلى مزود الذكاء الاصطناعي.", result.status);
   }
+
+  return NextResponse.json({ answer: result.answer }, { headers: { "Cache-Control": "no-store" } });
+}
 }
