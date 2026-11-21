@@ -146,3 +146,38 @@ test("rejects invalid JSON and empty provider answers", async (t) => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("cancels provider error response bodies that are not consumed", async () => {
+  const originalFetch = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    cancel() { cancelled = true; },
+  }), { status: 503 });
+  try {
+    assert.deepEqual(await fetchAssistantCompletion(options), {
+      ok: false, status: 502, reason: "provider_error",
+    });
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("cancels provider bodies rejected by the declared response size", async () => {
+  const originalFetch = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    cancel() { cancelled = true; },
+  }), {
+    status: 200,
+    headers: { "content-length": "1000001" },
+  });
+  try {
+    assert.deepEqual(await fetchAssistantCompletion(options), {
+      ok: false, status: 502, reason: "response_too_large",
+    });
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
