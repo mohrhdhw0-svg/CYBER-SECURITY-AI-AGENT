@@ -24,7 +24,7 @@ def require_auth(value: Optional[str]):
     if not TOKEN or not value or not secrets.compare_digest(value, f"Bearer {TOKEN}"):
         raise HTTPException(status_code=401, detail="Valid engine bearer token required")
 
-def valid_dynamic_permit(value: Optional[str], target: str) -> bool:
+def valid_dynamic_permit(value: Optional[str], target: str, authorization_reference: Optional[str] = None) -> bool:
     if not value or not PERMIT_SECRET: return False
     try:
         payload, signature = value.split(".", 1)
@@ -32,10 +32,20 @@ def valid_dynamic_permit(value: Optional[str], target: str) -> bool:
         supplied = base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))
         if not hmac.compare_digest(expected, supplied): return False
         data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-        return data.get("ip") == target and bool(data.get("id")) and isinstance(data.get("exp"), (int, float)) and data["exp"] > time.time() * 1000
+        request_id = data.get("id")
+        expires_at = data.get("exp")
+        if not isinstance(request_id, str) or len(request_id) != 36 or any(ch not in "0123456789abcdef" for ch in request_id):
+            return False
+        if isinstance(expires_at, bool) or not isinstance(expires_at, int) or expires_at <= int(time.time() * 1000):
+            return False
+        if data.get("ip") != target:
+            return False
+        if authorization_reference is not None and not hmac.compare_digest(authorization_reference, "admin-approved:" + request_id):
+            return False
+        return True
     except Exception: return False
 
-def check_target(value: str, permit: Optional[str] = None):
+def check_target(value: str, permit: Optional[str] = None, authorization_reference: Optional[str] = None):
     try: address = ipaddress.ip_address(value)
     except ValueError: raise HTTPException(status_code=400, detail="Target must be a literal IP address.")
     if not address.is_global: raise HTTPException(status_code=400, detail="Only globally routable public IP addresses are eligible.")
@@ -43,7 +53,7 @@ def check_target(value: str, permit: Optional[str] = None):
     if not NETWORKS:
         raise HTTPException(status_code=503, detail="The engine's authorized CIDR allowlist is not configured.")
     # The exact network allowlist is mandatory; admin approval cannot widen it.
-    if not valid_dynamic_permit(permit, str(address)):
+    if not valid_dynamic_permit(permit, str(address), authorization_reference):
         raise HTTPException(status_code=403, detail="Target requires an active admin approval bound to this exact IP.")
     if not any(address.version == net.version and address in net for net in NETWORKS):
         raise HTTPException(status_code=403, detail="Target is outside the engine's authorized CIDR restrictions.")
@@ -117,7 +127,7 @@ def tools(authorization: Optional[str] = Header(default=None)):
 def intel_scan(request: ScanRequest, authorization: Optional[str] = Header(default=None), x_scan_approval: Optional[str] = Header(default=None)):
     require_auth(authorization)
     if not request.confirm_authorized: raise HTTPException(status_code=400,detail="Explicit authorization confirmation is required.")
-    target=check_target(request.target_ip,x_scan_approval)
+    target=check_target(request.target_ip,x_scan_approval,request.authorization_reference)
     passive=passive_intel(target)
     active=nmap_data(target,request.top_ports)
     return {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"approved-public-ip-intelligence","passive":passive,"ports":active["ports"],"summary":active["summary"],"limitations":["Only the 100 most common TCP ports are checked by default.","No exploit attempts, credential attacks, vulnerability exploitation, or intrusive NSE scripts are run.","Reputation data requires an optional AbuseIPDB API key."]}
@@ -129,6 +139,6 @@ def nmap_scan(request: ScanRequest, authorization: Optional[str] = Header(defaul
     require_auth(authorization)
     if not request.confirm_authorized:
         raise HTTPException(status_code=400, detail="Explicit authorization confirmation is required.")
-    target = check_target(request.target_ip, x_scan_approval)
+    target = check_target(request.target_ip, x_scan_approval, request.authorization_reference)
     data = nmap_data(target, request.top_ports)
     return {"status":"completed","target":target,"authorization_reference":request.authorization_reference,"profile":"nmap-safe-profile","ports":data["ports"],"summary":data["summary"]}
