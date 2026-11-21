@@ -24,7 +24,7 @@ def require_auth(value: Optional[str]):
     if not TOKEN or not value or not secrets.compare_digest(value, f"Bearer {TOKEN}"):
         raise HTTPException(status_code=401, detail="Valid engine bearer token required")
 
-def valid_dynamic_permit(value: Optional[str], target: str, authorization_reference: Optional[str] = None) -> bool:
+def valid_dynamic_permit(value: Optional[str], target: str, authorization_reference: str) -> bool:
     if not value or not PERMIT_SECRET: return False
     try:
         payload, signature = value.split(".", 1)
@@ -40,12 +40,12 @@ def valid_dynamic_permit(value: Optional[str], target: str, authorization_refere
             return False
         if data.get("ip") != target:
             return False
-        if authorization_reference is not None and not hmac.compare_digest(authorization_reference, "admin-approved:" + request_id):
+        if not isinstance(authorization_reference, str) or not hmac.compare_digest(authorization_reference, "admin-approved:" + request_id):
             return False
         return True
     except Exception: return False
 
-def check_target(value: str, permit: Optional[str] = None, authorization_reference: Optional[str] = None):
+def check_target(value: str, permit: Optional[str], authorization_reference: str):
     try: address = ipaddress.ip_address(value)
     except ValueError: raise HTTPException(status_code=400, detail="Target must be a literal IP address.")
     if not address.is_global: raise HTTPException(status_code=400, detail="Only globally routable public IP addresses are eligible.")
