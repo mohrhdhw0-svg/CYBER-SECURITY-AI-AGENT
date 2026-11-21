@@ -37,6 +37,25 @@ test("sends credentials server-side and requests redirects to be rejected", asyn
   }
 });
 
+
+test("joins text content parts with real newline characters", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => jsonResponse({
+    choices: [{ message: { content: [
+      { type: "text", text: "first line" },
+      { type: "image", image_url: "ignored" },
+      { type: "text", text: "second line" },
+    ] } }],
+  });
+  try {
+    assert.deepEqual(await fetchAssistantCompletion(options), {
+      ok: true, answer: "first line\\nsecond line",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("maps provider HTTP 429 to a rate-limited failure", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response("busy", { status: 429 });
