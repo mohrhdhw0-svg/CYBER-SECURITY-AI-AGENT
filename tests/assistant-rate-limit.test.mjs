@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkAssistantRateLimit } from "../app/lib/assistant-rate-limit.js";
+import { checkAssistantRateLimit } from "../app/lib/assistant-rate-limit-impl.js";
 
 const envKeys = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "ADMIN_SESSION_SECRET"];
 
