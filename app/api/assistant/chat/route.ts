@@ -77,8 +77,17 @@ export async function POST(request: NextRequest) {
     return jsonError("خدمة الحماية المؤقتة غير متاحة؛ أوقفنا الطلب لحماية الخدمة.", 503);
   }
 
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (declaredLength > 100_000) return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
+
   let body: unknown;
-  try { body = await request.json(); } catch { return jsonError("صيغة الطلب غير صالحة.", 400); }
+  try {
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 100_000) {
+      return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
+    }
+    body = JSON.parse(rawBody);
+  } catch { return jsonError("صيغة الطلب غير صالحة.", 400); }
   const messages = (body as { messages?: unknown })?.messages;
   if (!Array.isArray(messages) || messages.length < 1 || messages.length > 12) {
     return jsonError("أرسل من رسالة واحدة إلى 12 رسالة في المحادثة.", 400);
