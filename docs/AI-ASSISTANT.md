@@ -11,7 +11,9 @@ Set these encrypted environment variables in the deployment environment:
 - `AI_MODEL`: exact model identifier accepted by the configured gateway.
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, and `ADMIN_SESSION_SECRET`: required for distributed per-IP chat rate limiting.
 
-The server sends requests to `{AI_API_BASE_URL}/chat/completions`. This works with compatible gateways; the gateway URL and credentials must be supplied by the project owner. The assistant route fails closed if Redis rate limiting is unavailable.
+The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI documents this OpenAI-compatible endpoint and uses `auto` as a supported model selector; its documented local default is `http://localhost:3001/v1`. For a Vercel deployment, `localhost` would refer to the Vercel runtime and is not a reachable gateway: the owner must provide a privately secured, reachable HTTPS endpoint. The gateway URL and unified key must be supplied by the project owner. The assistant route fails closed if Redis rate limiting is unavailable.
+
+**Important deployment constraint:** FreeLLMAPI describes itself as a single-user, trusted-network tool, not a production or multi-tenant service. Do not expose its dashboard or raw gateway publicly, and do not treat one personal free-tier key as permission to serve an unrestricted public audience. Before a public launch, use an inference provider and account plan whose terms explicitly allow this application and its intended users, or implement a separately reviewed multi-tenant gateway. The MIT license permits code reuse subject to its notice requirements, but does not override upstream model-provider terms.
 
 ## Limits and behavior
 
@@ -25,4 +27,4 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. This works wi
 
 ## Deployment
 
-Configure the variables in the Vercel project settings, then deploy the feature branch through a preview deployment. Do not merge into `main` until the preview and end-to-end provider test pass.
+Configure the variables in the Vercel project settings only after choosing a gateway that is reachable from Vercel and authorized for the intended audience. A local FreeLLMAPI address is not sufficient for Vercel. Then deploy the feature branch through a preview deployment. Do not merge into `main` until the preview and end-to-end provider test pass.
