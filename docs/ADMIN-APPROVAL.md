@@ -14,6 +14,7 @@ Set these in Render:
 - `ENGINE_API_TOKEN`: same value as Vercel.
 - `SCAN_APPROVAL_SECRET`: exactly the same value as Vercel.
 - `AUTHORIZED_CIDRS`: required comma-separated list of only the public IPs/CIDRs explicitly authorized for scanning. Leave scans disabled until the exact allowed ranges are configured; do not use documentation-only or private ranges.
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: the same persistent Upstash database configured in Vercel; required for engine-side idempotency and result replay.
 
 Generate secrets locally with `openssl rand -hex 32`. Never commit actual secrets.
 
@@ -39,4 +40,4 @@ The application uses Vercel Queues (public beta) with the `@vercel/queue` SDK. E
 
 Queue delivery is at-least-once. The consumer checks the request state and acquires a short Redis lease before calling the engine. The engine's durable Redis idempotency claim is the second boundary: completed results are replayed for seven days, while a claimed execution with no persisted result is treated as uncertain and duplicate scanning is blocked. This deliberately prefers a visible failed/uncertain request over silently running the same approved scan twice. Configure the same persistent Upstash REST credentials on both Vercel and the engine. The queue retries transient handler/storage failures; engine scan failures are stored as failed request results. The scan itself remains limited by the engine's public-IP authorization checks and bounded TCP service scan.
 
-Before enabling production traffic, verify that Queues is enabled on the intended Vercel project, Redis is configured, the Render engine is reachable, and the end-to-end approval flow completes successfully. No deployment or live scan is implied by a successful source build.
+The engine `/health` endpoint performs an authenticated Redis `PING`; a configured-but-unreachable Redis database is reported as degraded and disables scan execution. Before enabling production traffic, verify that Queues is enabled on the intended Vercel project, the same Redis database is reachable from both Vercel and Render, the Render engine is reachable, and the end-to-end approval flow completes successfully. No deployment or live scan is implied by a successful source build.
