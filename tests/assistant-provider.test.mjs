@@ -49,7 +49,7 @@ test("joins text content parts with real newline characters", async () => {
   });
   try {
     assert.deepEqual(await fetchAssistantCompletion(options), {
-      ok: true, answer: "first line\\nsecond line",
+      ok: true, answer: "first line\nsecond line",
     });
   } finally {
     globalThis.fetch = originalFetch;
