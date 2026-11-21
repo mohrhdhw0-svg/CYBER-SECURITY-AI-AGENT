@@ -74,12 +74,19 @@ test("fails closed when Redis reports a command error", async () => {
   }
 });
 
-test("treats an invalid Redis counter as blocked", async () => {
+test("fails closed when Redis returns a malformed or unsafe counter", async (t) => {
   const restore = setTestEnvironment();
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({ result: "not-a-number" });
   try {
-    assert.deepEqual(await checkAssistantRateLimit("203.0.113.10"), { allowed: false, remaining: 0 });
+    for (const invalidCounter of ["not-a-number", null, "1", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      await t.test(`rejects counter ${String(invalidCounter)}`, async () => {
+        globalThis.fetch = async () => Response.json({ result: invalidCounter });
+        await assert.rejects(
+          checkAssistantRateLimit("203.0.113.10"),
+          /invalid counter/,
+        );
+      });
+    }
   } finally {
     globalThis.fetch = originalFetch;
     restore();
