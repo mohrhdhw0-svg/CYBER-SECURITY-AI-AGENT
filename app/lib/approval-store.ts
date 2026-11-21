@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isPublicIPv4 } from "./public-ipv4.js";
+import { parseStoredRequest } from "./stored-scan-request.js";
 import { cookies } from "next/headers";
 const redisUrl=()=>process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/,"");
 const redisToken=()=>process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -48,20 +49,6 @@ async function redis(command:string[]){
  return data?.result;
 }
 export async function saveRequest(item:ScanRequest){await redis(["SET",`scan:req:${item.id}`,JSON.stringify(item),"EX","604800"]);await redis(["LPUSH","scan:req:index",item.id]);await redis(["LTRIM","scan:req:index","0","499"]);}
-const requestStatuses = new Set(["pending","approved","rejected","scanning","completed","failed"]);
-function parseStoredRequest(value: unknown, expectedId: string): ScanRequest | null {
- if(typeof value!=="string")throw new Error("Stored approval request is not text.");
- let parsed: unknown;
- try{parsed=JSON.parse(value)}catch{throw new Error("Stored approval request contains invalid JSON.");}
- if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("Stored approval request has an invalid shape.");
- const item=parsed as Record<string,unknown>;
- if(item.id!==expectedId||!/^([a-f0-9]{36})$/.test(expectedId)||typeof item.ip!=="string"||!isPublicIPv4(item.ip)||!requestStatuses.has(String(item.status))||typeof item.createdAt!=="string"||!Number.isFinite(Date.parse(item.createdAt)))throw new Error("Stored approval request failed validation.");
- if(item.expiresAt!==undefined&&(typeof item.expiresAt!=="string"||!Number.isFinite(Date.parse(item.expiresAt))))throw new Error("Stored approval expiry is invalid.");
- if(item.ticketProof!==undefined&&(typeof item.ticketProof!=="string"||! /^[a-f0-9]{64}$/.test(item.ticketProof)))throw new Error("Stored approval ticket proof is invalid.");
- if(item.authorizationReference!==undefined&&typeof item.authorizationReference!=="string")throw new Error("Stored authorization reference is invalid.");
- if(item.error!==undefined&&typeof item.error!=="string")throw new Error("Stored approval error is invalid.");
- return item as unknown as ScanRequest;
-}
 export async function getRequest(id:string):Promise<ScanRequest|null>{
  if(!/^[a-f0-9]{36}$/.test(id))return null;
  const value=await redis(["GET",`scan:req:${id}`]);
@@ -79,7 +66,7 @@ const sign=(value:string,secret:string)=>createHmac("sha256",secret).update(valu
 export function validSecret(value:string,expected:string){const a=Buffer.from(value),b=Buffer.from(expected);return a.length===b.length&&timingSafeEqual(a,b);}
 export async function setAdminSession(){const secret=process.env.ADMIN_SESSION_SECRET;if(!secret)throw new Error("Admin session secret missing");const payload=Buffer.from(JSON.stringify({exp:Date.now()+8*60*60*1000})).toString("base64url");const value=payload+"."+sign(payload,secret);(await cookies()).set("cyber_admin",value,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"strict",path:"/",maxAge:8*60*60});}
 export async function isAdmin(){const secret=process.env.ADMIN_SESSION_SECRET;if(!secret)return false;const value=(await cookies()).get("cyber_admin")?.value||"";const parts=value.split(".");if(parts.length!==2)return false;const [payload,sig]=parts;if(!/^[A-Za-z0-9_-]+$/.test(payload)||!/^[A-Za-z0-9_-]{43}$/.test(sig)||!validSecret(sig,sign(payload,secret)))return false;try{const claims=JSON.parse(Buffer.from(payload,"base64url").toString());return !!claims&&typeof claims.exp==="number"&&Number.isSafeInteger(claims.exp)&&claims.exp>Date.now();}catch{return false;}}
-export function createScanPermit(ip:string,id:string,expiresAt:string){const secret=process.env.SCAN_APPROVAL_SECRET;if(!secret)throw new Error("Scan permit secret missing");const exp=Date.parse(expiresAt);if(!isIPv4(ip)||!/^([a-f0-9]{36})$/.test(id)||!Number.isSafeInteger(exp)||exp<=Date.now())throw new Error("Scan permit claims are invalid.");const payload=Buffer.from(JSON.stringify({ip,id,exp})).toString("base64url");return payload+"."+sign(payload,secret);}
+export function createScanPermit(ip:string,id:string,expiresAt:string){const secret=process.env.SCAN_APPROVAL_SECRET;if(!secret)throw new Error("Scan permit secret missing");const exp=Date.parse(expiresAt);if(!isPublicIPv4(ip)||!/^([a-f0-9]{36})$/.test(id)||!Number.isSafeInteger(exp)||exp<=Date.now())throw new Error("Scan permit claims are invalid.");const payload=Buffer.from(JSON.stringify({ip,id,exp})).toString("base64url");return payload+"."+sign(payload,secret);}
 export function newId(){return randomBytes(18).toString("hex");}
 
 export async function checkLoginRateLimit(clientKey:string){
