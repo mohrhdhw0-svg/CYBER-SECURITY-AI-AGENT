@@ -176,10 +176,10 @@ class EngineGuardTests(unittest.TestCase):
             self.assertTrue(claimed)
             self.assertIsNone(cached)
             with self.assertRaises(main.HTTPException) as ctx:
-                main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+                main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
             self.assertEqual(ctx.exception.status_code, 409)
             main.persist_scan_result("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100, result)
-            claimed_again, replayed = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+            claimed_again, replayed = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF, "approved-public-ip-intelligence", 100)
             self.assertFalse(claimed_again)
             self.assertEqual(replayed, result)
 
