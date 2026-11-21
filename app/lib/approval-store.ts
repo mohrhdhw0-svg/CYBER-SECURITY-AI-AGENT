@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { isIPv4 } from "node:net";
+import { isPublicIPv4 } from "./public-ipv4.js";
 import { cookies } from "next/headers";
 const redisUrl=()=>process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/,"");
 const redisToken=()=>process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -55,7 +55,7 @@ function parseStoredRequest(value: unknown, expectedId: string): ScanRequest | n
  try{parsed=JSON.parse(value)}catch{throw new Error("Stored approval request contains invalid JSON.");}
  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("Stored approval request has an invalid shape.");
  const item=parsed as Record<string,unknown>;
- if(item.id!==expectedId||!/^([a-f0-9]{36})$/.test(expectedId)||typeof item.ip!=="string"||!isIPv4(item.ip)||!requestStatuses.has(String(item.status))||typeof item.createdAt!=="string"||!Number.isFinite(Date.parse(item.createdAt)))throw new Error("Stored approval request failed validation.");
+ if(item.id!==expectedId||!/^([a-f0-9]{36})$/.test(expectedId)||typeof item.ip!=="string"||!isPublicIPv4(item.ip)||!requestStatuses.has(String(item.status))||typeof item.createdAt!=="string"||!Number.isFinite(Date.parse(item.createdAt)))throw new Error("Stored approval request failed validation.");
  if(item.expiresAt!==undefined&&(typeof item.expiresAt!=="string"||!Number.isFinite(Date.parse(item.expiresAt))))throw new Error("Stored approval expiry is invalid.");
  if(item.ticketProof!==undefined&&(typeof item.ticketProof!=="string"||! /^[a-f0-9]{64}$/.test(item.ticketProof)))throw new Error("Stored approval ticket proof is invalid.");
  if(item.authorizationReference!==undefined&&typeof item.authorizationReference!=="string")throw new Error("Stored authorization reference is invalid.");
@@ -65,7 +65,7 @@ function parseStoredRequest(value: unknown, expectedId: string): ScanRequest | n
 export async function getRequest(id:string):Promise<ScanRequest|null>{
  if(!/^[a-f0-9]{36}$/.test(id))return null;
  const value=await redis(["GET",`scan:req:${id}`]);
- return value===null?null:parseStoredRequest(value,id);
+ return value===null||value===undefined?null:parseStoredRequest(value,id);
 }
 export type AdminScanRequest = Pick<ScanRequest, "id" | "ip" | "status" | "createdAt" | "expiresAt">;
 export async function listRequests():Promise<AdminScanRequest[]>{
