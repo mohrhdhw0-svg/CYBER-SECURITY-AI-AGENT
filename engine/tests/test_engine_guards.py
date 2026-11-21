@@ -10,6 +10,8 @@ from unittest.mock import patch
 os.environ["ENGINE_API_TOKEN"] = "test-token"
 os.environ["AUTHORIZED_CIDRS"] = "8.8.8.8/32"
 os.environ["SCAN_APPROVAL_SECRET"] = "test-approval-secret-at-least-32-bytes"
+os.environ["UPSTASH_REDIS_REST_URL"] = "https://redis.example.test"
+os.environ["UPSTASH_REDIS_REST_TOKEN"] = "test-redis-token"
 
 import main
 
@@ -147,6 +149,52 @@ class EngineGuardTests(unittest.TestCase):
         self.assertTrue(main.valid_dynamic_permit(permit, "8.8.8.8", AUTH_REF))
         self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "admin-approved:" + "b" * 36))
         self.assertFalse(main.valid_dynamic_permit(permit, "8.8.8.8", "unrelated-reference"))
+
+
+    def test_durable_scan_claim_blocks_duplicate_execution_and_replays_result(self):
+        store = {}
+
+        def fake_redis(command):
+            if command[0] == "GET":
+                return store.get(command[1])
+            if command[0] == "SET":
+                key, value = command[1], command[2]
+                if "NX" in command and key in store:
+                    return None
+                store[key] = value
+                return "OK"
+            raise AssertionError("Unexpected Redis command")
+
+        result = {
+            "status": "completed",
+            "target": "8.8.8.8",
+            "authorization_reference": AUTH_REF,
+            "ports": [],
+        }
+        with patch.object(main, "redis_command", side_effect=fake_redis):
+            claimed, cached = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+            self.assertTrue(claimed)
+            self.assertIsNone(cached)
+            with self.assertRaises(main.HTTPException) as ctx:
+                main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+            self.assertEqual(ctx.exception.status_code, 409)
+            main.persist_scan_result("a" * 36, result)
+            claimed_again, replayed = main.claim_scan_execution("a" * 36, "8.8.8.8", AUTH_REF)
+            self.assertFalse(claimed_again)
+            self.assertEqual(replayed, result)
+
+    def test_durable_idempotency_fails_closed_without_redis_configuration(self):
+        with patch.dict(os.environ, {"UPSTASH_REDIS_REST_URL": "", "UPSTASH_REDIS_REST_TOKEN": ""}):
+            with self.assertRaises(main.HTTPException) as ctx:
+                main.redis_command(["GET", "scan:test"])
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    def test_health_requires_durable_idempotency_storage(self):
+        with patch.dict(os.environ, {"UPSTASH_REDIS_REST_URL": "", "UPSTASH_REDIS_REST_TOKEN": ""}):
+            result = main.health("Bearer test-token")
+        self.assertEqual(result["status"], "degraded")
+        self.assertFalse(result["durable_idempotency_configured"])
+        self.assertFalse(result["execution_enabled"])
 
 if __name__ == "__main__":
     unittest.main()
