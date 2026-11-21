@@ -137,4 +137,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ answer: result.answer }, { headers: { "Cache-Control": "no-store" } });
 }
-}
