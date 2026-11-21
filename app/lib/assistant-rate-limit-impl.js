@@ -52,7 +52,10 @@ export async function checkAssistantRateLimit(clientKey) {
     signal: AbortSignal.timeout(4000),
   });
 
-  if (!response.ok) throw new Error("Assistant rate-limit storage request failed.");
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("Assistant rate-limit storage request failed.");
+  }
   const result = await response.json();
   if (result.error) throw new Error("Assistant rate-limit storage returned an error.");
   const count = result.result;
