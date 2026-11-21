@@ -13,6 +13,7 @@ Set these in Vercel (Production and Preview as appropriate):
 Set these in Render:
 - `ENGINE_API_TOKEN`: same value as Vercel.
 - `SCAN_APPROVAL_SECRET`: exactly the same value as Vercel.
+- `AUTHORIZED_CIDRS`: required comma-separated list of only the public IPs/CIDRs explicitly authorized for scanning. Leave scans disabled until the exact allowed ranges are configured; do not use documentation-only or private ranges.
 
 Generate secrets locally with `openssl rand -hex 32`. Never commit actual secrets.
 
@@ -29,7 +30,7 @@ The admin APIs enforce the signed session server-side; hiding the page URL is no
 
 ## Deployment
 
-Deploy branch `feature/admin-approval-ip-intel` as a preview first. Configure the environment variables above in that preview and in Render, then test a request through /admin. Do not merge to main until a successful build and end-to-end approval/scan test have been completed.
+Deploy branch `feature/cyber-ai-assistant` as a preview first. Configure the environment variables above in that preview and in Render, including the mandatory `AUTHORIZED_CIDRS` allowlist, then test a request through /admin. Do not merge to main until a successful build and end-to-end approval/scan test have been completed.
 
 
 ## Background scan processing
