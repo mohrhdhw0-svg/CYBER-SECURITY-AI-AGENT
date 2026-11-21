@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateAssistantMessages } from "../app/lib/assistant-messages.js";
+import { validateAssistantMessages, validateAssistantRequestBody } from "../app/lib/assistant-messages.js";
 
 test("accepts a user message and a valid alternating conversation", () => {
   assert.deepEqual(validateAssistantMessages([
@@ -49,4 +49,21 @@ test("drops all unrecognized message fields", () => {
   assert.deepEqual(validateAssistantMessages([
     { role: "user", content: "hello", name: "system", tool_calls: [{ id: "x" }] },
   ]), [{ role: "user", content: "hello" }]);
+});
+
+test("rejects null, arrays, primitives, and malformed outer request bodies", () => {
+  for (const value of [null, [], "text", 42, undefined, { messages: [] }, { other: "x" }]) {
+    assert.equal(validateAssistantRequestBody(value), null);
+  }
+});
+
+test("accepts only a valid messages field in the outer request body", () => {
+  assert.deepEqual(
+    validateAssistantRequestBody({ messages: [{ role: "user", content: "hello" }] }),
+    [{ role: "user", content: "hello" }],
+  );
+  assert.equal(
+    validateAssistantRequestBody({ messages: [{ role: "user", content: "hello" }], admin: true }),
+    null,
+  );
 });
