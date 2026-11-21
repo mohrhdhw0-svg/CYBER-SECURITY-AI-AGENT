@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseStoredRequest } from "../app/lib/stored-scan-request.js";
+import { parseStoredRequest, validScanResult } from "../app/lib/stored-scan-request.js";
 
 const id = "a".repeat(36);
 const base = {
@@ -99,4 +99,22 @@ test("rejects malformed or target-mismatched scan results", () => {
   }
   assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "scanning", authorizationReference: "admin-approved:" + id, result: validResult }), id));
   assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "completed", authorizationReference: "different-reference", result: validResult }), id));
+});
+
+
+test("validates engine results against the exact approved target and reference", () => {
+  const result = {
+    status: "completed",
+    target: "8.8.8.8",
+    authorization_reference: "admin-approved:" + id,
+    profile: "approved-public-ip-intelligence",
+    passive: { warnings: [] },
+    ports: [{ port: "443", protocol: "tcp", state: "open", service: "https", product: null, version: null }],
+    summary: { ports_observed: 1, open_ports: 1 },
+    limitations: ["Bounded test report"],
+  };
+  assert.equal(validScanResult(result, "8.8.8.8", "admin-approved:" + id), true);
+  assert.equal(validScanResult(result, "1.1.1.1", "admin-approved:" + id), false);
+  assert.equal(validScanResult(result, "8.8.8.8", "admin-approved:" + "c".repeat(36)), false);
+  assert.equal(validScanResult({ ...result, summary: null }, "8.8.8.8", "admin-approved:" + id), false);
 });
