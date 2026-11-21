@@ -124,6 +124,7 @@ export const POST = handleCallback(
       if (!response.ok) {
         if (
           response.status === 408 ||
+          response.status === 409 ||
           response.status === 429 ||
           response.status >= 500
         ) {
