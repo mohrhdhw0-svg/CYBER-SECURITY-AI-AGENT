@@ -18,7 +18,7 @@ test("accepts a valid stored scan request", () => {
 test("accepts supported lifecycle states and optional metadata", () => {
   const item = {
     ...base,
-    status: "scanning",
+    status: "completed",
     expiresAt: "2026-11-22T00:00:00.000Z",
     decisionAt: "2026-11-21T01:00:00.000Z",
     authorizationReference: "admin-approved:" + id,
@@ -95,6 +95,8 @@ test("rejects malformed or target-mismatched scan results", () => {
     { ...validResult, passive: [] },
   ];
   for (const result of invalidResults) {
-    assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "completed", result }), id));
+    assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "completed", authorizationReference: "admin-approved:" + id, result }), id));
   }
+  assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "scanning", authorizationReference: "admin-approved:" + id, result: validResult }), id));
+  assert.throws(() => parseStoredRequest(JSON.stringify({ ...base, status: "completed", authorizationReference: "different-reference", result: validResult }), id));
 });
