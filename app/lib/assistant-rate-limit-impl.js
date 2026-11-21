@@ -1,6 +1,45 @@
 import { createHmac } from "node:crypto";
 
 /**
+ * Parse the small Redis REST envelope without allowing an unbounded response.
+ * @param {Response} response
+ * @param {number} maxBytes
+ */
+async function readRedisResponse(response, maxBytes) {
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("Assistant rate-limit storage response is too large.");
+  }
+  if (!response.body) throw new Error("Assistant rate-limit storage returned an empty response.");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let totalBytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new Error("Assistant rate-limit storage response is too large.");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Assistant rate-limit storage returned invalid JSON.");
+  }
+}
+
+/**
  * Distributed per-IP request limit. Fails closed when Redis is unavailable.
  * @param {string} clientKey
  */
@@ -56,7 +95,7 @@ export async function checkAssistantRateLimit(clientKey) {
     await response.body?.cancel().catch(() => {});
     throw new Error("Assistant rate-limit storage request failed.");
   }
-  const result = await response.json();
+  const result = await readRedisResponse(response, 16_384);
   if (result.error) throw new Error("Assistant rate-limit storage returned an error.");
   const count = result.result;
   // Upstash returns the Redis integer as a JSON number. Reject null,
