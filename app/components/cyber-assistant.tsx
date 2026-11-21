@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { Bot, Send, ShieldCheck, X, Sparkles, LoaderCircle, Trash2 } from "lucide-react";
 
 type Message = { role: "user" | "assistant"; content: string; id: string };
