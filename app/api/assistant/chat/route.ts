@@ -17,6 +17,35 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(body);
+}
+
 export async function GET() {
   const configured = Boolean(
     process.env.AI_API_BASE_URL &&
@@ -78,16 +107,18 @@ export async function POST(request: NextRequest) {
   }
 
   const declaredLength = Number(request.headers.get("content-length") || 0);
-  if (declaredLength > 100_000) return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
+  if (Number.isFinite(declaredLength) && declaredLength > 100_000) {
+    return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
+  }
 
   let body: unknown;
   try {
-    const rawBody = await request.text();
-    if (new TextEncoder().encode(rawBody).byteLength > 100_000) {
-      return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
-    }
+    // Enforce the byte limit while streaming, even when Content-Length is absent
+    // or falsified by a client or an upstream proxy.
+    const rawBody = await readBodyWithLimit(request, 100_000);
+    if (rawBody === null) return jsonError("حجم الطلب أكبر من الحد المسموح.", 413);
     body = JSON.parse(rawBody);
-  } catch { return jsonError("صيغة الطلب غير صالحة.", 400); }
+  } catch { return jsonError("صيغة الطلب غير صالحة أو غير مشفرة بصيغة UTF-8 صحيحة.", 400); }
   const messages = (body as { messages?: unknown })?.messages;
   if (!Array.isArray(messages) || messages.length < 1 || messages.length > 12) {
     return jsonError("أرسل من رسالة واحدة إلى 12 رسالة في المحادثة.", 400);
