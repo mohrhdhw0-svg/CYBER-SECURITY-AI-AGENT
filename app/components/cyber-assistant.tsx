@@ -44,7 +44,7 @@ export default function CyberAssistant() {
       const response = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next.slice(-12).map(({ role, content }) => ({ role, content })) })
+        body: JSON.stringify({ messages: next.slice(-11).map(({ role, content }) => ({ role, content })) })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "تعذر إرسال الرسالة.");
