@@ -6,7 +6,7 @@ This Docker-hosted service runs separately from Vercel. The current adapter perf
 
 - `ENGINE_API_TOKEN`: long random bearer token shared with the Vercel server environment.
 - `SCAN_APPROVAL_SECRET`: long random HMAC secret shared with Vercel; it must match exactly.
-- `AUTHORIZED_CIDRS` (optional): comma-separated additional IP/CIDR restrictions. These restrictions can narrow which approved targets are accepted, but they never replace or bypass the per-request admin approval permit.
+- `AUTHORIZED_CIDRS` (required): comma-separated public IP/CIDR allowlist. The engine refuses to enable scans when this is empty; every target must match this allowlist and also have a valid per-request admin approval permit.
 - `ABUSEIPDB_API_KEY` (optional): enables reputation enrichment.
 
 Never commit real credentials. Configure the engine variables in the Docker host/Render service and the matching Vercel variables in the intended Vercel project.
