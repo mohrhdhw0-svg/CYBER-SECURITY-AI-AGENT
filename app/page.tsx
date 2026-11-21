@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import EnginePanel from "./components/engine-panel";
+import CyberAssistant from "./components/cyber-assistant";
 import {
   Activity, ShieldCheck, Radar, Bug, Network, Smartphone, Cloud,
   Search, FileText, Settings, LayoutDashboard, Boxes, ChevronLeft,
@@ -123,7 +124,8 @@ export default function Home() {
         <footer><span>CYBER SECURITY AI AGENT</span><span><CircleCheck size={14}/> واجهة أولية — لا توجد عمليات فحص نشطة</span></footer>
       </div>
     </section>
-  </main>;
+  </main>
+    <CyberAssistant />;
 }
 
 function Stat({icon:Icon,label,value,detail,tone}:{icon:typeof Boxes;label:string;value:string;detail:string;tone:string}) {
