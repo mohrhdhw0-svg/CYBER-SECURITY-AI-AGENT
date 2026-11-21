@@ -27,6 +27,8 @@ The server sends requests to `{AI_API_BASE_URL}/chat/completions`. FreeLLMAPI do
 
 - Maximum 12 conversation messages per request.
 - Maximum 6,000 characters per message.
+- Maximum 100 KB request body, enforced while reading the request stream (not only from the optional `Content-Length` header).
+- Maximum 1 MB upstream provider response, enforced while reading the response stream.
 - 15 requests per IP per 10-minute window, enforced through Redis.
 - 45-second provider timeout and 1,200-token response limit.
 - Conversation state is held in the browser session and is not persisted to the database.
